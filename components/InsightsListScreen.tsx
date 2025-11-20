@@ -1,7 +1,6 @@
 import { ArrowLeft, CheckCircle, XCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Card } from './ui/card';
-import { WeightedMomentumChart } from './WeightedMomentumChart';
 
 interface SavedInsight {
   id: string;
@@ -66,15 +65,6 @@ export function InsightsListScreen({ insights, onBack, onSelectInsight, weeklyMo
 
       {/* Content */}
       <div className="flex-1 px-6 space-y-4 overflow-y-auto pb-6">
-        {/* Weighted Momentum Chart */}
-        <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.15 }}
-        >
-          <WeightedMomentumChart weeklyData={weeklyData} />
-        </motion.div>
-
         {/* Insights List */}
         {sortedInsights.length > 0 ? (
           sortedInsights.map((insight, index) => (
