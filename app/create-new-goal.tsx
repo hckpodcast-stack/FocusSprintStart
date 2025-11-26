@@ -12,13 +12,11 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import type { Reminder } from "../lib/goals-storage";
+import { startGoalDraft } from "../lib/goal-draft";
+import { VoiceMemoCard } from "../components/VoiceMemoCard";
 
 type MemoMode = "voice" | "text";
-
-type Reminder = {
-  id: string;
-  dateTime: Date;
-};
 
 type DatePickerOverlayProps = {
   initialDate: Date;
@@ -252,80 +250,95 @@ function TimePickerOverlay(props: TimePickerOverlayProps) {
         <View style={styles.timeColumnsRow}>
           <View style={styles.timeColumn}>
             <Text style={styles.timeColumnLabel}>Hour</Text>
-            {hours.map((value) => {
-              const isSelected = value === hour;
-              return (
-                <TouchableOpacity
-                  key={value}
-                  style={[
-                    styles.timeValueChip,
-                    isSelected && styles.timeValueChipSelected,
-                  ]}
-                  onPress={() => setHour(value)}
-                >
-                  <Text
+            <ScrollView
+              style={styles.timeValuesScroll}
+              showsVerticalScrollIndicator={false}
+            >
+              {hours.map((value) => {
+                const isSelected = value === hour;
+                return (
+                  <TouchableOpacity
+                    key={value}
                     style={[
-                      styles.timeValueText,
-                      isSelected && styles.timeValueTextSelected,
+                      styles.timeValueChip,
+                      isSelected && styles.timeValueChipSelected,
                     ]}
+                    onPress={() => setHour(value)}
                   >
-                    {formatTwo(value)}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+                    <Text
+                      style={[
+                        styles.timeValueText,
+                        isSelected && styles.timeValueTextSelected,
+                      ]}
+                    >
+                      {formatTwo(value)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
           </View>
 
           <View style={styles.timeColumn}>
             <Text style={styles.timeColumnLabel}>Min</Text>
-            {minutes.map((value) => {
-              const isSelected = value === minute;
-              return (
-                <TouchableOpacity
-                  key={value}
-                  style={[
-                    styles.timeValueChip,
-                    isSelected && styles.timeValueChipSelected,
-                  ]}
-                  onPress={() => setMinute(value)}
-                >
-                  <Text
+            <ScrollView
+              style={styles.timeValuesScroll}
+              showsVerticalScrollIndicator={false}
+            >
+              {minutes.map((value) => {
+                const isSelected = value === minute;
+                return (
+                  <TouchableOpacity
+                    key={value}
                     style={[
-                      styles.timeValueText,
-                      isSelected && styles.timeValueTextSelected,
+                      styles.timeValueChip,
+                      isSelected && styles.timeValueChipSelected,
                     ]}
+                    onPress={() => setMinute(value)}
                   >
-                    {formatTwo(value)}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+                    <Text
+                      style={[
+                        styles.timeValueText,
+                        isSelected && styles.timeValueTextSelected,
+                      ]}
+                    >
+                      {formatTwo(value)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
           </View>
 
           <View style={styles.timeColumn}>
             <Text style={styles.timeColumnLabel}>Period</Text>
-            {(["AM", "PM"] as const).map((value) => {
-              const isSelected = value === period;
-              return (
-                <TouchableOpacity
-                  key={value}
-                  style={[
-                    styles.timeValueChip,
-                    isSelected && styles.timeValueChipSelected,
-                  ]}
-                  onPress={() => setPeriod(value)}
-                >
-                  <Text
+            <ScrollView
+              style={styles.timeValuesScroll}
+              showsVerticalScrollIndicator={false}
+            >
+              {(["AM", "PM"] as const).map((value) => {
+                const isSelected = value === period;
+                return (
+                  <TouchableOpacity
+                    key={value}
                     style={[
-                      styles.timeValueText,
-                      isSelected && styles.timeValueTextSelected,
+                      styles.timeValueChip,
+                      isSelected && styles.timeValueChipSelected,
                     ]}
+                    onPress={() => setPeriod(value)}
                   >
-                    {value}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+                    <Text
+                      style={[
+                        styles.timeValueText,
+                        isSelected && styles.timeValueTextSelected,
+                      ]}
+                    >
+                      {value}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
           </View>
         </View>
 
@@ -433,9 +446,12 @@ export default function CreateNewGoal() {
   const [waveformValues, setWaveformValues] = useState<number[]>(
     () => new Array(40).fill(0.3),
   );
+  const [recordingUri, setRecordingUri] = useState<string | null>(null);
 
   const recordingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const playbackIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recordingRef = useRef<null>(null);
+  const playbackSoundRef = useRef<null>(null);
 
   const updateWaveform = () => {
     setWaveformValues((previous) =>
@@ -498,30 +514,12 @@ export default function CreateNewGoal() {
     };
   }, [isPlaying, recordSeconds]);
 
-  const handleToggleRecord = () => {
-    if (!isRecording) {
-      setRecordSeconds(0);
-      setPlaybackSeconds(0);
-      setIsPlaying(false);
-      updateWaveform();
-      setIsRecording(true);
-      return;
-    }
-    setIsRecording(false);
+  const handleToggleRecord = async () => {
+    // Deprecated: behavior handled by VoiceMemoCard
   };
 
-  const handleTogglePlayback = () => {
-    if (recordSeconds <= 0 || isRecording) {
-      return;
-    }
-    if (isPlaying) {
-      setIsPlaying(false);
-    } else {
-      if (playbackSeconds >= recordSeconds) {
-        setPlaybackSeconds(0);
-      }
-      setIsPlaying(true);
-    }
+  const handleTogglePlayback = async () => {
+    // Deprecated: behavior handled by VoiceMemoCard
   };
 
   const handleBack = () => {
@@ -529,14 +527,26 @@ export default function CreateNewGoal() {
   };
 
   const handleNext = () => {
-    // TODO: Wire this to the next step of your goal creation flow.
-    console.log("Next pressed with data:", {
+    const memoType: "voice" | "text" | null =
+      memoMode === "voice" && recordSeconds > 0
+        ? "voice"
+        : memoMode === "text" && textMemo.trim().length > 0
+        ? "text"
+        : null;
+
+    startGoalDraft({
       title,
-      deadline: goalDateTime.toISOString(),
-      reminders,
-      memoMode,
-      textMemo,
+      dueAt: goalDateTime.toISOString(),
+      reminders: reminders.map((reminder) => ({
+        id: reminder.id,
+        dateTime: reminder.dateTime.toISOString(),
+      })),
+      memoType,
+      textMemo: memoType === "text" ? textMemo : undefined,
+      voiceMemoFileUri: memoType === "voice" ? recordingUri ?? undefined : undefined,
     });
+
+    router.push("/add-info");
   };
 
   const toggleMemoMode = () => {
@@ -664,53 +674,14 @@ export default function CreateNewGoal() {
               </View>
 
               {memoMode === "voice" ? (
-                <View style={styles.voiceCard}>
-                  <View style={styles.waveformRow}>
-                    {waveformValues.map((value, index) => (
-                      <View
-                        key={index}
-                        style={[
-                          styles.waveformBar,
-                          {
-                            height: 16 + value * 16,
-                          },
-                        ]}
-                      />
-                    ))}
-                  </View>
-                  <View style={styles.voiceBottomRow}>
-                    <View style={styles.voiceTimerRow}>
-                      <Text style={styles.voiceTimerText}>
-                        {formatDuration(isPlaying ? playbackSeconds : recordSeconds)} /{" "}
-                        {formatDuration(MAX_RECORD_SECONDS)}
-                      </Text>
-                      {recordSeconds > 0 && !isRecording && (
-                        <TouchableOpacity
-                          style={styles.voicePlayButton}
-                          onPress={handleTogglePlayback}
-                          activeOpacity={0.9}
-                        >
-                          <Feather
-                            name={isPlaying ? "pause" : "play"}
-                            size={18}
-                            color="#3D4F5F"
-                          />
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.voiceRecordButton}
-                    activeOpacity={0.9}
-                    onPress={handleToggleRecord}
-                  >
-                    <Feather
-                      name={isRecording ? "stop" : "mic"}
-                      size={20}
-                      color="#FFFFFF"
-                    />
-                  </TouchableOpacity>
-                </View>
+                <VoiceMemoCard
+                  maxSeconds={MAX_RECORD_SECONDS}
+                  initialUri={recordingUri}
+                  onChange={({ uri, durationSeconds }) => {
+                    setRecordingUri(uri);
+                    setRecordSeconds(durationSeconds);
+                  }}
+                />
               ) : (
                 <View>
                   <View style={styles.memoInputShell}>
@@ -1065,6 +1036,9 @@ const styles = StyleSheet.create({
   timeColumn: {
     flex: 1,
     marginHorizontal: 4,
+  },
+  timeValuesScroll: {
+    maxHeight: 180,
   },
   timeColumnLabel: {
     fontSize: 12,

@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Dimensions,
   FlatList,
@@ -13,11 +13,12 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { loadGoals, Goal as StoredGoal } from "../lib/goals-storage";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CARD_HORIZONTAL_MARGIN = 16;
 const CARD_SPACING = 16;
-const CARD_WIDTH = SCREEN_WIDTH - CARD_HORIZONTAL_MARGIN * 2;
+const CARD_WIDTH = SCREEN_WIDTH - 32;
 
 type Goal = {
   id: string;
@@ -258,24 +259,37 @@ function HomeScreen(props: HomeScreenProps) {
 
 export default function Index() {
   const router = useRouter();
+  const { banner } = useLocalSearchParams<{ banner?: string }>();
+  const [showGoalLockedBanner, setShowGoalLockedBanner] = useState(
+    banner === "goalLocked",
+  );
+  const [goals, setGoals] = useState<StoredGoal[]>([]);
 
-  const sampleGoals: Goal[] = [
-    {
-      id: "1",
-      title: "Design new components",
-      dueDate: new Date().toISOString(),
-    },
-    {
-      id: "2",
-      title: "Plan weekly focus sessions",
-      dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: "3",
-      title: "Review last week reflections",
-      dueDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-  ];
+  useEffect(() => {
+    if (banner === "goalLocked") {
+      setShowGoalLockedBanner(true);
+      const timer = setTimeout(() => setShowGoalLockedBanner(false), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [banner]);
+  useEffect(() => {
+    let isMounted = true;
+    loadGoals()
+      .then((data) => {
+        if (!isMounted) return;
+        setGoals(
+          data.sort((a, b) =>
+            a.dueAt.localeCompare(b.dueAt),
+          ),
+        );
+      })
+      .catch((error) => {
+        console.log("Failed to load goals", error);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [banner]);
 
   const handleCheckInGoal = (goal: Goal) => {
     router.push("/check-in");
@@ -290,15 +304,26 @@ export default function Index() {
   };
 
   return (
-    <HomeScreen
-      streakDays={3}
-      totalReflections={2}
-      reflectionThreshold={3}
-      goals={sampleGoals}
-      onCheckInGoal={handleCheckInGoal}
-      onOpenReflectionLog={handleOpenReflectionLog}
-      onCreateNewGoal={handleCreateNewGoal}
-    />
+    <>
+      {showGoalLockedBanner && (
+        <View style={styles.goalLockedBanner}>
+          <Text style={styles.goalLockedBannerText}>Goal locked in</Text>
+        </View>
+      )}
+      <HomeScreen
+        streakDays={3}
+        totalReflections={2}
+        reflectionThreshold={3}
+        goals={goals.map((goal) => ({
+          id: goal.id,
+          title: goal.title,
+          dueDate: goal.dueAt,
+        }))}
+        onCheckInGoal={handleCheckInGoal}
+        onOpenReflectionLog={handleOpenReflectionLog}
+        onCreateNewGoal={handleCreateNewGoal}
+      />
+    </>
   );
 }
 
@@ -359,7 +384,7 @@ const styles = StyleSheet.create({
     color: "#2F3C4A",
   },
   goalListContent: {
-    paddingHorizontal: CARD_HORIZONTAL_MARGIN,
+    paddingHorizontal: 0,
     paddingVertical: 8,
   },
   goalCardWrapper: {
@@ -513,5 +538,22 @@ const styles = StyleSheet.create({
   emptyStateSubtitle: {
     fontSize: 14,
     color: "#8D9299",
+  },
+  goalLockedBanner: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    top: 60,
+    zIndex: 20,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: "#D4F4E8",
+    alignItems: "center",
+  },
+  goalLockedBannerText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#064E3B",
   },
 });

@@ -43,7 +43,7 @@ export default function CheckIn() {
       useNativeDriver: true,
     }).start(() => {
       setShowConfetti(false);
-      router.push("/completed-it");
+      router.push("/reflect");
     });
   };
 
@@ -230,4 +230,3 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
 });
-
