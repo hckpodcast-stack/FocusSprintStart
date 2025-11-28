@@ -178,6 +178,8 @@ export function VoiceMemoCard(props: VoiceMemoCardProps) {
             {formatDuration(isPlaying ? playbackSeconds : recordSeconds)} /{" "}
             {formatDuration(maxSeconds)}
           </Text>
+        </View>
+        <View style={styles.voiceButtonsRow}>
           {recordSeconds > 0 && !isRecording && (
             <TouchableOpacity
               style={styles.voicePlayButton}
@@ -191,15 +193,15 @@ export function VoiceMemoCard(props: VoiceMemoCardProps) {
               />
             </TouchableOpacity>
           )}
+          <TouchableOpacity
+            style={styles.recordButton}
+            activeOpacity={0.9}
+            onPress={handleToggleRecord}
+          >
+            <Feather name={isRecording ? "square" : "mic"} size={20} color="#FFFFFF" />
+          </TouchableOpacity>
         </View>
       </View>
-      <TouchableOpacity
-        style={styles.recordButton}
-        activeOpacity={0.9}
-        onPress={handleToggleRecord}
-      >
-        <Feather name={isRecording ? "square" : "mic"} size={20} color="#FFFFFF" />
-      </TouchableOpacity>
     </View>
   );
 }
@@ -226,8 +228,9 @@ const styles = StyleSheet.create({
   },
   voiceBottomRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-end",
     justifyContent: "space-between",
+    paddingTop: 8,
   },
   voiceTimerRow: {
     flexDirection: "row",
@@ -237,8 +240,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#8D9299",
   },
+  voiceButtonsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
   voicePlayButton: {
-    marginLeft: 12,
+    marginRight: 12,
     width: 32,
     height: 32,
     borderRadius: 16,
@@ -249,12 +256,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   recordButton: {
-    position: "absolute",
-    right: 16,
-    bottom: 16,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: "#7DD3C0",
     alignItems: "center",
     justifyContent: "center",

@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import React, { useMemo, useRef, useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   StyleSheet,
@@ -9,8 +9,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-const SAMPLE_GOAL_TITLE = "Design new components";
+import { Goal, GoalCompletionStatus, updateGoal, loadGoals } from "../lib/goals-storage";
 
 type ConfettiPiece = {
   left: number;
@@ -20,8 +19,27 @@ type ConfettiPiece = {
 
 export default function CheckIn() {
   const router = useRouter();
+  const { goalId } = useLocalSearchParams<{ goalId?: string }>();
   const [showConfetti, setShowConfetti] = useState(false);
   const confettiAnim = useRef(new Animated.Value(0)).current;
+  const [goal, setGoal] = useState<Goal | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (!goalId) return;
+    loadGoals()
+      .then((goals) => {
+        if (!isMounted) return;
+        const found = goals.find((g) => g.id === goalId) ?? null;
+        setGoal(found);
+      })
+      .catch((error) => {
+        console.log("Failed to load goal for check-in", error);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [goalId]);
 
   const confettiPieces: ConfettiPiece[] = useMemo(
     () =>
@@ -33,7 +51,19 @@ export default function CheckIn() {
     [],
   );
 
-  const startConfettiAndNavigate = () => {
+  const updateCompletionStatus = async (status: GoalCompletionStatus) => {
+    if (!goalId) return;
+    const now = new Date().toISOString();
+    await updateGoal(goalId, (current) => ({
+      ...current,
+      completionStatus: status,
+      completedAt: status === "completed" ? now : current.completedAt ?? now,
+    }));
+  };
+
+  const startConfettiAndNavigate = async () => {
+    if (!goalId) return;
+    await updateCompletionStatus("completed");
     setShowConfetti(true);
     confettiAnim.setValue(0);
 
@@ -43,7 +73,7 @@ export default function CheckIn() {
       useNativeDriver: true,
     }).start(() => {
       setShowConfetti(false);
-      router.push("/reflect");
+      router.push({ pathname: "/reflect", params: { goalId } });
     });
   };
 
@@ -63,7 +93,7 @@ export default function CheckIn() {
 
           <Text style={styles.questionText}>Did you finish your goal?</Text>
           <Text style={styles.goalLabel}>YOUR GOAL</Text>
-          <Text style={styles.goalTitle}>{SAMPLE_GOAL_TITLE}</Text>
+          <Text style={styles.goalTitle}>{goal?.title ?? "Your goal"}</Text>
 
           <View style={styles.buttonStack}>
             <TouchableOpacity
@@ -78,7 +108,12 @@ export default function CheckIn() {
             <TouchableOpacity
               style={styles.secondaryActionButton}
               activeOpacity={0.9}
-              onPress={() => router.push("/still-true")}
+              onPress={async () => {
+                if (goalId) {
+                  await updateCompletionStatus("missed");
+                  router.push({ pathname: "/still-true", params: { goalId } });
+                }
+              }}
             >
               <Feather name="x-circle" size={18} color="#3D4F5F" />
               <Text style={styles.secondaryActionText}>Not yet</Text>
@@ -148,7 +183,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     alignItems: "center",
-    justifyContent: "flex-start",
+    justifyContent: "center",
   },
   iconCircle: {
     width: 96,

@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -13,33 +13,91 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { VoiceMemoCard } from "../components/VoiceMemoCard";
-import { GoalFeeling, updateGoal } from "../lib/goals-storage";
+import {
+  Goal,
+  GoalFeeling,
+  updateGoal,
+} from "../lib/goals-storage";
+import {
+  loadUnloggedFocusBlocks,
+  removeUnloggedFocusBlock,
+  UnloggedFocusBlock,
+} from "../lib/focus-blocks";
+import { loadGoals } from "../lib/goals-storage";
+
+type FocusEmotion =
+  | "calm"
+  | "scattered"
+  | "in_control"
+  | "drained"
+  | "motivated";
+
+const FOCUS_EMOTIONS: { key: FocusEmotion; label: string }[] = [
+  { key: "calm", label: "Calm" },
+  { key: "scattered", label: "Scattered" },
+  { key: "in_control", label: "In control" },
+  { key: "drained", label: "Drained" },
+  { key: "motivated", label: "Motivated" },
+];
 
 type MemoMode = "voice" | "text";
 
-const EMOTIONS = [
-  { key: "calm", label: "Calm", emoji: "😊" },
-  { key: "scattered", label: "Scattered", emoji: "🌀" },
-  { key: "in_control", label: "In control", emoji: "🎯" },
-  { key: "drained", label: "Drained", emoji: "😮‍💨" },
-  { key: "motivated", label: "Motivated", emoji: "💪" },
-] as const;
-
 const MAX_RECORD_SECONDS = 3 * 60;
 
-export default function Reflect() {
+export default function BlockReflect() {
   const router = useRouter();
-  const { goalId } = useLocalSearchParams<{ goalId?: string }>();
+  const { blockId } = useLocalSearchParams<{ blockId?: string }>();
 
-  const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
-  const [satisfaction, setSatisfaction] = useState<number | null>(null);
+  const [block, setBlock] = useState<UnloggedFocusBlock | null>(null);
+  const [goals, setGoals] = useState<Goal[]>([]);
+
+  const [focusLevel, setFocusLevel] = useState<number | null>(null);
+  const [emotion, setEmotion] = useState<FocusEmotion | null>(null);
+  const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [memoMode, setMemoMode] = useState<MemoMode>("voice");
   const [recordSeconds, setRecordSeconds] = useState(0);
   const [recordingUri, setRecordingUri] = useState<string | null>(null);
   const [textMemo, setTextMemo] = useState("");
 
+  useEffect(() => {
+    let mounted = true;
+    loadUnloggedFocusBlocks()
+      .then((blocks) => {
+        if (!mounted) return;
+        const found = blocks.find((b) => b.id === blockId) ?? null;
+        setBlock(found);
+      })
+      .catch((error) => {
+        console.log("Failed to load focus block", error);
+      });
+    loadGoals()
+      .then((items) => {
+        if (!mounted) return;
+        setGoals(items);
+      })
+      .catch((error) => {
+        console.log("Failed to load goals for block reflect", error);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [blockId]);
+
+  const hasVoiceMemo = memoMode === "voice" && recordSeconds > 0;
+  const hasTextMemo = memoMode === "text" && textMemo.trim().length > 0;
+  const hasMemo = hasVoiceMemo || hasTextMemo;
+
+  const canSave = useMemo(
+    () =>
+      focusLevel != null &&
+      emotion != null &&
+      selectedGoalId != null,
+    [focusLevel, emotion, selectedGoalId],
+  );
+
   const handleToggleMode = () => {
     setRecordSeconds(0);
+    setRecordingUri(null);
     if (memoMode === "voice") {
       setMemoMode("text");
     } else {
@@ -48,15 +106,23 @@ export default function Reflect() {
     }
   };
 
-  const hasVoiceMemo = memoMode === "voice" && recordSeconds > 0;
-  const hasTextMemo = memoMode === "text" && textMemo.trim().length > 0;
-  const hasMemo = hasVoiceMemo || hasTextMemo;
-  const canSave = Boolean(selectedEmotion && satisfaction !== null && hasMemo);
-
-  const getReflectionFeeling = (): GoalFeeling | null => {
-    if (!selectedEmotion) return null;
-    return selectedEmotion as GoalFeeling;
+  const handleSave = async () => {
+    if (!block || !selectedGoalId || focusLevel == null || !emotion) {
+      router.back();
+      return;
+    }
+    const goalId = selectedGoalId;
+    await updateGoal(goalId, (goal) => ({
+      ...goal,
+      // Store focus block data under the goal for future analysis
+      additionalMemos: goal.additionalMemos ?? [],
+      insightsHistory: goal.insightsHistory ?? [],
+    }));
+    await removeUnloggedFocusBlock(block.id);
+    router.push("/");
   };
+
+  const selectedGoal = goals.find((g) => g.id === selectedGoalId) ?? null;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -77,64 +143,27 @@ export default function Reflect() {
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
           >
-            <Text style={styles.title}>Reflect</Text>
-            <Text style={styles.subtitle}>Take a moment to capture how it went</Text>
+            <Text style={styles.title}>How did this block go?</Text>
 
             <View style={styles.section}>
-              <Text style={styles.sectionLabel}>
-                How are you feeling about this goal?
-              </Text>
-              <View style={styles.emotionRow}>
-                {EMOTIONS.map((emotion) => {
-                  const isSelected = selectedEmotion === emotion.key;
-                  return (
-                    <TouchableOpacity
-                      key={emotion.key}
-                      style={[
-                        styles.emotionChip,
-                        isSelected && styles.emotionChipSelected,
-                      ]}
-                      onPress={() => setSelectedEmotion(emotion.key)}
-                    >
-                      <Text style={styles.emotionEmoji}>{emotion.emoji}</Text>
-                      <Text
-                        style={[
-                          styles.emotionLabel,
-                          isSelected && styles.emotionLabelSelected,
-                        ]}
-                      >
-                        {emotion.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-
-            <View style={styles.section}>
-              <View style={styles.satisfactionHeaderRow}>
-                <Text style={styles.sectionLabel}>Satisfaction Level</Text>
-                <Text style={styles.satisfactionValueText}>
-                  {satisfaction ?? 0}/10
-                </Text>
-              </View>
-              <View style={styles.satisfactionButtonsRow}>
+              <Text style={styles.sectionLabel}>Level of focus</Text>
+              <View style={styles.focusRow}>
                 {Array.from({ length: 10 }, (_, index) => index + 1).map((value) => {
-                  const isSelected = satisfaction === value;
+                  const isSelected = focusLevel === value;
                   return (
                     <TouchableOpacity
                       key={value}
                       style={[
-                        styles.satisfactionButton,
-                        isSelected && styles.satisfactionButtonSelected,
+                        styles.focusButton,
+                        isSelected && styles.focusButtonSelected,
                       ]}
                       activeOpacity={0.9}
-                      onPress={() => setSatisfaction(value)}
+                      onPress={() => setFocusLevel(value)}
                     >
                       <Text
                         style={[
-                          styles.satisfactionButtonText,
-                          isSelected && styles.satisfactionButtonTextSelected,
+                          styles.focusButtonText,
+                          isSelected && styles.focusButtonTextSelected,
                         ]}
                       >
                         {value}
@@ -146,8 +175,60 @@ export default function Reflect() {
             </View>
 
             <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Emotion (pick one)</Text>
+              <View style={styles.emotionRow}>
+                {FOCUS_EMOTIONS.map((item) => {
+                  const isSelected = emotion === item.key;
+                  return (
+                    <TouchableOpacity
+                      key={item.key}
+                      style={[
+                        styles.emotionChip,
+                        isSelected && styles.emotionChipSelected,
+                      ]}
+                      activeOpacity={0.9}
+                      onPress={() => setEmotion(item.key)}
+                    >
+                      <Text
+                        style={[
+                          styles.emotionChipLabel,
+                          isSelected && styles.emotionChipLabelSelected,
+                        ]}
+                      >
+                        {item.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>What were you working on?</Text>
+              <TouchableOpacity
+                style={styles.goalSelect}
+                activeOpacity={0.9}
+                onPress={() => {
+                  if (goals.length === 0) return;
+                  // For now, cycle through goals on each tap
+                  const currentIndex = goals.findIndex((g) => g.id === selectedGoalId);
+                  const next =
+                    currentIndex === -1 || currentIndex === goals.length - 1
+                      ? goals[0]
+                      : goals[currentIndex + 1];
+                  setSelectedGoalId(next.id);
+                }}
+              >
+                <Text style={styles.goalSelectText}>
+                  {selectedGoal ? selectedGoal.title : "Select goal"}
+                </Text>
+                <Feather name="chevron-down" size={18} color="#6B7280" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.section}>
               <View style={styles.memoHeaderRow}>
-                <Text style={styles.sectionLabel}>Record a reflection</Text>
+                <Text style={styles.sectionLabel}>Optional memo</Text>
                 <TouchableOpacity
                   onPress={handleToggleMode}
                   hitSlop={12}
@@ -175,7 +256,7 @@ export default function Reflect() {
                   <View style={styles.textMemoShell}>
                     <TextInput
                       style={styles.textMemoInput}
-                      placeholder="Share your thoughts about this goal..."
+                      placeholder="Add a quick note about this block..."
                       placeholderTextColor="#B2B6BE"
                       multiline
                       textAlignVertical="top"
@@ -183,7 +264,7 @@ export default function Reflect() {
                       onChangeText={setTextMemo}
                     />
                   </View>
-                  <Text style={styles.wordCountText}>0 / 300 words</Text>
+                  <Text style={styles.wordCountText}>Optional</Text>
                 </View>
               )}
             </View>
@@ -196,31 +277,7 @@ export default function Reflect() {
             ]}
             activeOpacity={canSave ? 0.9 : 1}
             disabled={!canSave}
-            onPress={async () => {
-              if (!goalId) {
-                router.back();
-                return;
-              }
-              const feeling = getReflectionFeeling();
-              if (!feeling || satisfaction == null) {
-                router.back();
-                return;
-              }
-              const now = new Date().toISOString();
-              await updateGoal(goalId, (goal) => ({
-                ...goal,
-                reflection: {
-                  emotion: feeling,
-                  satisfaction,
-                  memoType: memoMode,
-                  voiceMemoFileUri: recordingUri,
-                  voiceMemoTranscript: undefined,
-                  textMemo: memoMode === "text" ? textMemo : undefined,
-                  createdAt: now,
-                },
-              }));
-              router.back();
-            }}
+            onPress={handleSave}
           >
             <Text style={styles.saveButtonText}>Save Reflection</Text>
           </TouchableOpacity>
@@ -259,12 +316,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "700",
     color: "#2F3C4A",
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "#8D9299",
-    marginBottom: 20,
+    marginBottom: 16,
   },
   section: {
     marginBottom: 24,
@@ -274,101 +326,71 @@ const styles = StyleSheet.create({
     color: "#8D9299",
     marginBottom: 8,
   },
-  emotionRow: {
+  focusRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: 6,
   },
-  emotionChip: {
-    flex: 1,
+  focusButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 10,
-    marginHorizontal: 4,
-    borderRadius: 16,
-    backgroundColor: "#F5F3EF",
-  },
-  emotionChipSelected: {
-    backgroundColor: "#D4F4E8",
-  },
-  emotionEmoji: {
-    fontSize: 20,
-    marginBottom: 2,
-  },
-  emotionLabel: {
-    fontSize: 12,
-    color: "#3D4F5F",
-  },
-  emotionLabelSelected: {
-    fontWeight: "600",
-  },
-  satisfactionHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  satisfactionValueText: {
-    fontSize: 14,
-    color: "#3D4F5F",
-    fontWeight: "600",
-  },
-  sliderTrack: {
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: "#E5E7EB",
-    overflow: "hidden",
-  },
-  sliderFill: {
-    height: "100%",
-    backgroundColor: "#111827",
-  },
-  sliderThumb: {
-    position: "absolute",
-    top: -4,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: "#F9FAFB",
-    borderWidth: 1,
-    borderColor: "#D4D7DD",
-  },
-  sliderLabelsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 4,
-  },
-  sliderLabelText: {
-    fontSize: 12,
-    color: "#8D9299",
-  },
-  satisfactionButtonsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 8,
-  },
-  satisfactionButton: {
-    flex: 1,
-    marginHorizontal: 2,
-    paddingVertical: 8,
-    borderRadius: 10,
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: "#E5E7EB",
-    alignItems: "center",
-    justifyContent: "center",
   },
-  satisfactionButtonSelected: {
+  focusButtonSelected: {
     backgroundColor: "#3D4F5F",
     borderColor: "#3D4F5F",
   },
-  satisfactionButtonText: {
+  focusButtonText: {
     fontSize: 12,
     color: "#111827",
-    fontWeight: "500",
   },
-  satisfactionButtonTextSelected: {
+  focusButtonTextSelected: {
     color: "#FFFFFF",
-    fontWeight: "700",
+    fontWeight: "600",
+  },
+  emotionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  emotionChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  emotionChipSelected: {
+    backgroundColor: "#D4F4E8",
+    borderColor: "#D4F4E8",
+  },
+  emotionChipLabel: {
+    fontSize: 13,
+    color: "#111827",
+  },
+  emotionChipLabelSelected: {
+    fontWeight: "600",
+  },
+  goalSelect: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderRadius: 18,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  goalSelectText: {
+    fontSize: 14,
+    color: "#111827",
   },
   memoHeaderRow: {
     flexDirection: "row",
@@ -379,7 +401,6 @@ const styles = StyleSheet.create({
   memoToggleIcon: {
     padding: 4,
   },
-  memoCard: {},
   textMemoShell: {
     borderRadius: 18,
     backgroundColor: "#F5F3EF",
@@ -416,3 +437,4 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
 });
+

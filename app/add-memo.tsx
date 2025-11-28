@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -13,14 +13,14 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { VoiceMemoCard } from "../components/VoiceMemoCard";
+import { updateGoal } from "../lib/goals-storage";
 
 type MemoMode = "voice" | "text";
 
 const MAX_RECORD_SECONDS = 3 * 60;
-const SAMPLE_GOAL_TITLE = "Design new components";
-
 export default function AddMemo() {
   const router = useRouter();
+  const { goalId } = useLocalSearchParams<{ goalId?: string }>();
 
   const [memoMode, setMemoMode] = useState<MemoMode>("voice");
   const [recordSeconds, setRecordSeconds] = useState(0);
@@ -73,9 +73,7 @@ export default function AddMemo() {
             keyboardShouldPersistTaps="handled"
           >
             <Text style={styles.title}>Add Memo</Text>
-            <Text style={styles.subtitle}>
-              Add additional thoughts about "{SAMPLE_GOAL_TITLE}"
-            </Text>
+            <Text style={styles.subtitle}>Add additional thoughts about this goal</Text>
 
             <View style={styles.section}>
               <View style={styles.memoHeaderRow}>
@@ -128,8 +126,26 @@ export default function AddMemo() {
             ]}
             activeOpacity={canSave ? 0.9 : 1}
             disabled={!canSave}
-            onPress={() => {
-              console.log("Save memo", { memoMode, hasVoiceMemo, hasTextMemo });
+            onPress={async () => {
+              if (!goalId) {
+                router.back();
+                return;
+              }
+              const now = new Date().toISOString();
+              const memoId = `${Date.now()}`;
+              await updateGoal(goalId, (goal) => ({
+                ...goal,
+                additionalMemos: [
+                  ...(goal.additionalMemos ?? []),
+                  {
+                    id: memoId,
+                    createdAt: now,
+                    memoType: memoMode,
+                    voiceMemoFileUri: recordingUri,
+                    textMemo: memoMode === "text" ? textMemo : undefined,
+                  },
+                ],
+              }));
               router.back();
             }}
           >

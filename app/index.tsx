@@ -16,9 +16,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { loadGoals, Goal as StoredGoal } from "../lib/goals-storage";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const CARD_HORIZONTAL_MARGIN = 16;
 const CARD_SPACING = 16;
 const CARD_WIDTH = SCREEN_WIDTH - 32;
+const LIST_SNAP_INTERVAL = CARD_WIDTH + CARD_SPACING;
+const LIST_SIDE_PADDING = (SCREEN_WIDTH - CARD_WIDTH) / 2;
 
 type Goal = {
   id: string;
@@ -34,6 +35,7 @@ type HomeScreenProps = {
   onCheckInGoal?: (goal: Goal) => void;
   onOpenReflectionLog?: () => void;
   onCreateNewGoal?: () => void;
+  onStartFocusBlock?: () => void;
 };
 
 type GoalDueStatus = {
@@ -97,8 +99,10 @@ function HomeScreen(props: HomeScreenProps) {
     onCheckInGoal,
     onOpenReflectionLog,
     onCreateNewGoal,
+    onStartFocusBlock,
   } = props;
 
+  const [cardHeight, setCardHeight] = useState<number | null>(null);
   const [activeGoalIndex, setActiveGoalIndex] = useState(0);
   const hasGoals = goals.length > 0;
 
@@ -107,10 +111,10 @@ function HomeScreen(props: HomeScreenProps) {
     [totalReflections, reflectionThreshold],
   );
 
-  const handleScrollEnd = useCallback(
+  const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       const offsetX = event.nativeEvent.contentOffset.x;
-      const index = Math.round(offsetX / (CARD_WIDTH + CARD_SPACING));
+      const index = Math.round(offsetX / LIST_SNAP_INTERVAL);
       setActiveGoalIndex(Math.max(0, Math.min(index, goals.length - 1)));
     },
     [goals.length],
@@ -122,7 +126,18 @@ function HomeScreen(props: HomeScreenProps) {
       const dateLabel = formatDueDateLabel(item.dueDate);
 
       return (
-        <View style={styles.goalCardWrapper}>
+        <View
+          style={styles.goalCardWrapper}
+          onLayout={(event) => {
+            const { height } = event.nativeEvent.layout;
+            
+            // Only save the first non-null height we see
+            if (cardHeight == null && height > 0) {
+              setCardHeight(height);
+              console.log("Measured goal card height:", height);
+            }
+          }}
+        >
           <View style={styles.goalCard}>
             <View style={styles.goalCardHeader}>
               <Text style={styles.upNextLabel}>UP NEXT</Text>
@@ -187,9 +202,13 @@ function HomeScreen(props: HomeScreenProps) {
             </View>
           </View>
 
-          <View style={styles.menuIconContainer}>
+          <TouchableOpacity
+            style={styles.menuIconContainer}
+            onPress={() => router.push("/unlogged")}
+            activeOpacity={0.8}
+          >
             <Feather name="menu" size={20} color="#8D9299" />
-          </View>
+          </TouchableOpacity>
         </View>
 
         <Text style={styles.screenTitle}>Intention Archive</Text>
@@ -197,15 +216,20 @@ function HomeScreen(props: HomeScreenProps) {
         {hasGoals ? (
           <>
             <FlatList
+              style={cardHeight ? [{ height: cardHeight }, styles.goalList] : styles.goalList}
               data={goals}
               keyExtractor={(item) => item.id}
               renderItem={renderGoalItem}
               horizontal
               showsHorizontalScrollIndicator={false}
-              snapToInterval={CARD_WIDTH + CARD_SPACING}
+              snapToInterval={LIST_SNAP_INTERVAL}
               decelerationRate="fast"
-              contentContainerStyle={styles.goalListContent}
-              onMomentumScrollEnd={handleScrollEnd}
+              scrollEventThrottle={16}
+              onScroll={handleScroll}
+              contentContainerStyle={[
+                styles.goalListContent,
+                { paddingHorizontal: LIST_SIDE_PADDING },
+              ]}
             />
 
             <View style={styles.goalDotsRow}>
@@ -222,6 +246,14 @@ function HomeScreen(props: HomeScreenProps) {
                 );
               })}
             </View>
+
+            <TouchableOpacity
+              style={styles.focusBlockCard}
+              activeOpacity={0.9}
+              onPress={onStartFocusBlock}
+            >
+              <Text style={styles.focusBlockTitle}>Tap to focus</Text>
+            </TouchableOpacity>
           </>
         ) : (
           <View style={styles.emptyStateCard}>
@@ -292,15 +324,22 @@ export default function Index() {
   }, [banner]);
 
   const handleCheckInGoal = (goal: Goal) => {
-    router.push("/check-in");
+    router.push({
+      pathname: "/check-in",
+      params: { goalId: goal.id },
+    });
   };
 
   const handleOpenReflectionLog = () => {
-    console.log("Open Reflection Log");
+    router.push("/reflection-log");
   };
 
   const handleCreateNewGoal = () => {
     router.push("/create-new-goal");
+  };
+
+  const handleStartFocusBlock = () => {
+    router.push("/focus-block");
   };
 
   return (
@@ -322,6 +361,7 @@ export default function Index() {
         onCheckInGoal={handleCheckInGoal}
         onOpenReflectionLog={handleOpenReflectionLog}
         onCreateNewGoal={handleCreateNewGoal}
+        onStartFocusBlock={handleStartFocusBlock}
       />
     </>
   );
@@ -383,17 +423,19 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#2F3C4A",
   },
+  goalList: {
+    
+  },
   goalListContent: {
-    paddingHorizontal: 0,
-    paddingVertical: 8,
+    paddingVertical: 0,
   },
   goalCardWrapper: {
     width: CARD_WIDTH,
-    marginRight: CARD_SPACING,
+    marginHorizontal: CARD_SPACING / 2,
   },
   goalCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 20,
+    borderRadius:20,
     paddingHorizontal: 20,
     paddingVertical: 20,
     shadowColor: "#000",
@@ -480,8 +522,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 8,
-    marginBottom: 24,
+    marginTop: 4,
+    marginBottom: 16,
   },
   goalDot: {
     height: 6,
@@ -496,6 +538,26 @@ const styles = StyleSheet.create({
     width: 6,
     backgroundColor: "#D4D7DD",
   },
+  focusBlockCard: {
+    marginTop: 8,
+    marginBottom: 16,
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  focusBlockTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#2F3C4A",
+  },
   reflectionCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -503,7 +565,7 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     borderRadius: 20,
     backgroundColor: "#F5F3EF",
-    marginBottom: 16,
+    marginBottom: 20,
   },
   reflectionIconContainer: {
     width: 32,
@@ -555,5 +617,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: "#064E3B",
+  },
+  insightsEntryButton: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 24,
   },
 });

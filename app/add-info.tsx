@@ -10,11 +10,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { BackButton } from "../components/BackButton";
 import { updateDraftInfo } from "../lib/goal-draft";
-import type {
-  FrictionType,
-  GoalFeeling,
-  GoalType,
-} from "../lib/goals-storage";
+import type { FrictionType, GoalFeeling, GoalType } from "../lib/goals-storage";
 
 const GOAL_TYPES = [
   { key: "launch", label: "Launch", emoji: "🚀" },
@@ -25,11 +21,11 @@ const GOAL_TYPES = [
 ] as const;
 
 const EMOTIONS = [
-  { key: "great", label: "Great", emoji: "😊" },
-  { key: "calm", label: "Calm", emoji: "😌" },
-  { key: "okay", label: "Okay", emoji: "😐" },
-  { key: "tough", label: "Tough", emoji: "😓" },
-  { key: "frustrated", label: "Frustrated", emoji: "😤" },
+  { key: "calm", label: "Calm", emoji: "😊" },
+  { key: "scattered", label: "Scattered", emoji: "🌀" },
+  { key: "in_control", label: "In control", emoji: "🎯" },
+  { key: "drained", label: "Drained", emoji: "😮‍💨" },
+  { key: "motivated", label: "Motivated", emoji: "💪" },
 ] as const;
 
 const FRICTIONS = [
