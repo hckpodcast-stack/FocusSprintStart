@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
+  AppState,
   Easing,
   StyleSheet,
   Text,
@@ -21,7 +22,7 @@ import {
 } from "../lib/focus-blocks";
 
 const FOCUS_DURATION_MS = 25 * 60 * 1000;
-const CARD_BG = "#FFFFFF";
+const CARD_BG = "#EFECE5";
 const OVERTIME_BG = "#7DD3C0";
 
 function formatCountdown(msRemaining: number): string {
@@ -48,9 +49,9 @@ export default function FocusBlock() {
   const [now, setNow] = useState<number>(Date.now());
   const [hasVibratedAtZero, setHasVibratedAtZero] = useState(false);
   const [phase, setPhase] = useState<"idle" | "countdown" | "running">("idle");
-  const countdownValue = useRef(new Animated.Value(3)).current;
-  const rippleScale = useRef(new Animated.Value(0)).current;
   const rippleBg = useRef(new Animated.Value(0)).current;
+  const appState = useRef(AppState.currentState);
+  const startScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     let mounted = true;
@@ -83,6 +84,32 @@ export default function FocusBlock() {
   }, [activeBlock]);
 
   useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      const prevState = appState.current;
+      appState.current = nextState;
+
+      if (prevState === "active" && nextState === "background") {
+        if (activeBlock) {
+          cancelActiveFocusBlock()
+            .catch((error) =>
+              console.log("Failed to cancel focus block on background", error),
+            )
+            .finally(() => {
+              setActiveBlock(null);
+              setPhase("idle");
+              setNow(Date.now());
+              setHasVibratedAtZero(false);
+            });
+        }
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [activeBlock, cancelActiveFocusBlock]);
+
+  useEffect(() => {
     if (!activeBlock) return;
     const startMs = new Date(activeBlock.startedAt).getTime();
     const elapsed = now - startMs;
@@ -105,10 +132,8 @@ export default function FocusBlock() {
     };
     await setActiveFocusBlock(block);
     setActiveBlock(block);
-    setPhase("countdown");
+    setPhase("running");
 
-    countdownValue.setValue(3);
-    rippleScale.setValue(0);
     rippleBg.setValue(0);
 
     // Immediate "block running" notification with actions
@@ -133,24 +158,22 @@ export default function FocusBlock() {
       trigger: { seconds: FOCUS_DURATION_MS / 1000 },
     });
 
+    // Brief visual feedback: timer scale pulse
+    startScale.setValue(1);
     Animated.sequence([
-      Animated.timing(countdownValue, {
-        toValue: 0,
-        duration: 3000,
-        useNativeDriver: false,
-        easing: Easing.linear,
+      Animated.timing(startScale, {
+        toValue: 1.08,
+        duration: 150,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.quad),
       }),
-      Animated.parallel([
-        Animated.timing(rippleScale, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-          easing: Easing.out(Easing.quad),
-        }),
-      ]),
-    ]).start(() => {
-      setPhase("running");
-    });
+      Animated.timing(startScale, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+        easing: Easing.in(Easing.quad),
+      }),
+    ]).start();
   };
 
   const handleDone = async () => {
@@ -173,16 +196,34 @@ export default function FocusBlock() {
 
   const renderTimer = () => {
     if (!activeBlock) {
-      return <Text style={styles.timerText}>25:00</Text>;
+      return (
+        <Animated.Text
+          style={[styles.timerText, { transform: [{ scale: startScale }] }]}
+        >
+          25:00
+        </Animated.Text>
+      );
     }
     const startMs = new Date(activeBlock.startedAt).getTime();
     const elapsed = now - startMs;
     if (elapsed < FOCUS_DURATION_MS) {
       const remaining = FOCUS_DURATION_MS - elapsed;
-      return <Text style={styles.timerText}>{formatCountdown(remaining)}</Text>;
+      return (
+        <Animated.Text
+          style={[styles.timerText, { transform: [{ scale: startScale }] }]}
+        >
+          {formatCountdown(remaining)}
+        </Animated.Text>
+      );
     }
     const over = elapsed - FOCUS_DURATION_MS;
-    return <Text style={styles.timerText}>{formatOvertime(over)}</Text>;
+    return (
+      <Animated.Text
+        style={[styles.timerText, { transform: [{ scale: startScale }] }]}
+      >
+        {formatOvertime(over)}
+      </Animated.Text>
+    );
   };
 
   const bgColor = rippleBg.interpolate({
@@ -190,64 +231,57 @@ export default function FocusBlock() {
     outputRange: [CARD_BG, OVERTIME_BG],
   });
 
-  const showCountdownOverlay = phase === "countdown";
-
-  const countdownNumber = countdownValue.interpolate({
-    inputRange: [0, 1, 2, 3],
-    outputRange: [1, 1, 2, 3],
-    extrapolate: "clamp",
-  });
-
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <Animated.View style={[styles.container, { backgroundColor: bgColor }]}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={handleCancel} hitSlop={16}>
-            <Feather name="x" size={22} color="#3D4F5F" />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.content}>
-          {!activeBlock && (
-            <TouchableOpacity
-              style={styles.focusCard}
-              activeOpacity={0.9}
-              onPress={handleStart}
-            >
-              <Text style={styles.focusTitle}>Tap to focus</Text>
+    <Animated.View style={[styles.screen, { backgroundColor: bgColor }]}>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.container}>
+          <View style={styles.headerRow}>
+            <TouchableOpacity onPress={handleCancel} hitSlop={16}>
+              <Feather name="x" size={22} color="#3D4F5F" />
             </TouchableOpacity>
-          )}
+          </View>
 
-          {activeBlock && (
-            <View style={styles.timerBlock}>
-              {renderTimer()}
-              <TouchableOpacity
-                style={styles.doneButton}
-                activeOpacity={0.9}
-                onPress={handleDone}
-              >
-                <Text style={styles.doneButtonText}>Done</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          <View style={styles.content}>
+            {!activeBlock && (
+              <View style={styles.timerBlock}>
+                <Text style={styles.timerText}>25:00</Text>
+                <TouchableOpacity
+                  style={styles.primaryButton}
+                  activeOpacity={0.9}
+                  onPress={handleStart}
+                >
+                  <Text style={styles.primaryButtonText}>Start</Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
-          {showCountdownOverlay && (
-            <View style={styles.countdownOverlay}>
-              <Animated.Text style={styles.countdownText}>
-                {countdownNumber as any}
-              </Animated.Text>
-            </View>
-          )}
+            {activeBlock && (
+              <View style={styles.timerBlock}>
+                {renderTimer()}
+                <TouchableOpacity
+                  style={styles.primaryButton}
+                  activeOpacity={0.9}
+                  onPress={handleDone}
+                >
+                  <Text style={styles.primaryButtonText}>Done</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+          </View>
         </View>
-      </Animated.View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
   safeArea: {
     flex: 1,
-    backgroundColor: "#EFECE5",
+    backgroundColor: "transparent",
   },
   container: {
     flex: 1,
@@ -265,25 +299,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  focusCard: {
-    width: "100%",
-    borderRadius: 20,
-    backgroundColor: CARD_BG,
-    paddingHorizontal: 20,
-    paddingVertical: 24,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  focusTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#2F3C4A",
-  },
   timerBlock: {
     alignItems: "center",
     justifyContent: "center",
@@ -295,12 +310,18 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   doneButton: {
+    display: "none",
+  },
+  doneButtonText: {
+    display: "none",
+  },
+  primaryButton: {
     borderRadius: 18,
     paddingVertical: 14,
     paddingHorizontal: 48,
     backgroundColor: "#3D4F5F",
   },
-  doneButtonText: {
+  primaryButtonText: {
     fontSize: 16,
     fontWeight: "600",
     color: "#FFFFFF",

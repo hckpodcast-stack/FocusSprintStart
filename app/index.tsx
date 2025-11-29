@@ -216,7 +216,8 @@ function HomeScreen(props: HomeScreenProps) {
         {hasGoals ? (
           <>
             <FlatList
-              style={cardHeight ? [{ height: cardHeight }, styles.goalList] : styles.goalList}
+              //style={cardHeight ? [{ height: cardHeight }, styles.goalList] : styles.goalList}
+              style={styles.goalList}
               data={goals}
               keyExtractor={(item) => item.id}
               renderItem={renderGoalItem}
@@ -522,7 +523,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 4,
+    marginTop: 0,
     marginBottom: 16,
   },
   goalDot: {
