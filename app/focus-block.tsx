@@ -1,6 +1,5 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -15,10 +14,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   ActiveFocusBlock,
+  cancelActiveFocusBlock,
+  completeActiveFocusBlock,
   getActiveFocusBlock,
   setActiveFocusBlock,
-  completeActiveFocusBlock,
-  cancelActiveFocusBlock,
 } from "../lib/focus-blocks";
 
 const FOCUS_DURATION_MS = 25 * 60 * 1000;
@@ -133,30 +132,31 @@ export default function FocusBlock() {
     await setActiveFocusBlock(block);
     setActiveBlock(block);
     setPhase("running");
+    setNow(Date.now());
 
     rippleBg.setValue(0);
 
     // Immediate "block running" notification with actions
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: "Focus block running",
-        body: "Tap Done when you're finished, or X to cancel.",
-        categoryIdentifier: "focus-block",
-        data: { type: "focus-block" },
-      },
-      trigger: null,
-    });
+    // await Notifications.scheduleNotificationAsync({
+    //   content: {
+    //     title: "Focus block running",
+    //     body: "Tap Done when you're finished, or X to cancel.",
+    //     categoryIdentifier: "focus-block",
+    //     data: { type: "focus-block" },
+    //   },
+    //   trigger: null,
+    // });
 
     // Scheduled "block finished" notification at 25 minutes
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: "Focus block complete",
-        body: "Your 25-minute block has finished.",
-        categoryIdentifier: "focus-block",
-        data: { type: "focus-block", kind: "finished" },
-      },
-      trigger: { seconds: FOCUS_DURATION_MS / 1000 },
-    });
+    // await Notifications.scheduleNotificationAsync({
+    //   content: {
+    //     title: "Focus block complete",
+    //     body: "Your 25-minute block has finished.",
+    //     categoryIdentifier: "focus-block",
+    //     data: { type: "focus-block", kind: "finished" },
+    //   },
+    //   trigger: { seconds: FOCUS_DURATION_MS / 1000 },
+    // });
 
     // Brief visual feedback: timer scale pulse
     startScale.setValue(1);
@@ -205,7 +205,7 @@ export default function FocusBlock() {
       );
     }
     const startMs = new Date(activeBlock.startedAt).getTime();
-    const elapsed = now - startMs;
+    const elapsed = Math.max(0, now - startMs);
     if (elapsed < FOCUS_DURATION_MS) {
       const remaining = FOCUS_DURATION_MS - elapsed;
       return (

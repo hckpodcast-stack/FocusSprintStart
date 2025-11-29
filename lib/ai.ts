@@ -184,7 +184,7 @@ export async function generateInsightsForGoals(goals: {
             "- why-summary or initial memo (voice transcript or text)",
             "- reflection data: emotion, satisfaction level, and reflection memo",
             "",
-            "1) First, write a single short paragraph of insights (3–6 sentences) that helps the user understand their patterns, strengths, and friction points across these goals.",
+            "1) First, write a single short paragraph of insights (3–6 sentences) that helps the user understand their patterns, strengths, and friction points across these goals. Last, provide 2 separte bullet points that highlight the users' weaknesses and strengths when executing a project",
             "   - If both completed and missed goals are present, explicitly contrast the patterns you see between them.",
             "   - Refer to concrete details when possible (e.g., clarity of outcome, specific obstacles mentioned).",
             "",

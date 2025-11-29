@@ -324,6 +324,11 @@ export default function Index() {
     };
   }, [banner]);
 
+  const visibleGoals = goals.filter((goal) => {
+    const status = goal.completionStatus;
+    return status !== "completed" && status !== "missed";
+  });
+
   const handleCheckInGoal = (goal: Goal) => {
     router.push({
       pathname: "/check-in",
@@ -354,7 +359,7 @@ export default function Index() {
         streakDays={3}
         totalReflections={2}
         reflectionThreshold={3}
-        goals={goals.map((goal) => ({
+        goals={visibleGoals.map((goal) => ({
           id: goal.id,
           title: goal.title,
           dueDate: goal.dueAt,
