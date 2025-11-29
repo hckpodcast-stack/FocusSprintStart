@@ -79,12 +79,18 @@ export async function completeActiveFocusBlock(): Promise<UnloggedFocusBlock | n
     0,
     Math.round((endedAtMs - startedAtMs) / 1000),
   );
+  const blockLengthSeconds = 25 * 60;
+  const blockCount =
+    blockLengthSeconds > 0
+      ? Math.max(0, Math.floor(durationSeconds / blockLengthSeconds))
+      : 0;
 
   const block: UnloggedFocusBlock = {
     id: active.id,
     startedAt: active.startedAt,
     endedAt: new Date(endedAtMs).toISOString(),
     durationSeconds,
+    blockCount,
   };
 
   await appendUnloggedFocusBlock(block);
@@ -92,4 +98,3 @@ export async function completeActiveFocusBlock(): Promise<UnloggedFocusBlock | n
 
   return block;
 }
-

@@ -62,6 +62,7 @@ export type FocusBlock = {
   startedAt: string;
   endedAt: string;
   durationSeconds: number;
+  blockCount: number;
 };
 
 export type Goal = {

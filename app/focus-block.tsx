@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -18,6 +19,8 @@ import {
   completeActiveFocusBlock,
   getActiveFocusBlock,
   setActiveFocusBlock,
+  UnloggedFocusBlock,
+  removeUnloggedFocusBlock,
 } from "../lib/focus-blocks";
 
 const FOCUS_DURATION_MS = 25 * 60 * 1000;
@@ -46,11 +49,15 @@ export default function FocusBlock() {
   const router = useRouter();
   const [activeBlock, setActiveBlock] = useState<ActiveFocusBlock | null>(null);
   const [now, setNow] = useState<number>(Date.now());
-  const [hasVibratedAtZero, setHasVibratedAtZero] = useState(false);
+  const [completedIntervals, setCompletedIntervals] = useState(0);
   const [phase, setPhase] = useState<"idle" | "countdown" | "running">("idle");
+  const [summaryBlock, setSummaryBlock] = useState<UnloggedFocusBlock | null>(
+    null,
+  );
   const rippleBg = useRef(new Animated.Value(0)).current;
   const appState = useRef(AppState.currentState);
   const startScale = useRef(new Animated.Value(1)).current;
+  const completionNotificationIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -95,9 +102,9 @@ export default function FocusBlock() {
             )
             .finally(() => {
               setActiveBlock(null);
+              setCompletedIntervals(0);
               setPhase("idle");
               setNow(Date.now());
-              setHasVibratedAtZero(false);
             });
         }
       }
@@ -111,18 +118,24 @@ export default function FocusBlock() {
   useEffect(() => {
     if (!activeBlock) return;
     const startMs = new Date(activeBlock.startedAt).getTime();
-    const elapsed = now - startMs;
-    if (elapsed >= FOCUS_DURATION_MS && !hasVibratedAtZero) {
+    const elapsed = Math.max(0, now - startMs);
+    const intervals = Math.floor(elapsed / FOCUS_DURATION_MS);
+
+    if (intervals > 0 && intervals > completedIntervals) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-      setHasVibratedAtZero(true);
-      Animated.timing(rippleBg, {
-        toValue: 1,
-        duration: 800,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: false,
-      }).start();
+
+      if (intervals === 1) {
+        Animated.timing(rippleBg, {
+          toValue: 1,
+          duration: 800,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: false,
+        }).start();
+      }
+
+      setCompletedIntervals(intervals);
     }
-  }, [activeBlock, now, hasVibratedAtZero, rippleBg]);
+  }, [activeBlock, now, completedIntervals, rippleBg]);
 
   const handleStart = async () => {
     const block: ActiveFocusBlock = {
@@ -132,7 +145,24 @@ export default function FocusBlock() {
     await setActiveFocusBlock(block);
     setActiveBlock(block);
     setPhase("running");
+    setCompletedIntervals(0);
     setNow(Date.now());
+
+    try {
+      const id = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "Focus block complete",
+          body: "Your 25-minute focus block has finished.",
+        },
+        trigger: { seconds: FOCUS_DURATION_MS / 1000 },
+      });
+      completionNotificationIdRef.current = id;
+    } catch (error) {
+      console.log(
+        "Failed to schedule focus block completion notification",
+        error,
+      );
+    }
 
     rippleBg.setValue(0);
 
@@ -178,20 +208,66 @@ export default function FocusBlock() {
 
   const handleDone = async () => {
     const block = await completeActiveFocusBlock();
+    if (completionNotificationIdRef.current) {
+      Notifications.cancelScheduledNotificationAsync(
+        completionNotificationIdRef.current,
+      ).catch((error) =>
+        console.log(
+          "Failed to cancel focus block completion notification on done",
+          error,
+        ),
+      );
+      completionNotificationIdRef.current = null;
+    }
     if (!block) {
       router.back();
       return;
     }
     setActiveBlock(null);
+    setCompletedIntervals(0);
     setPhase("idle");
-    router.push({ pathname: "/block-reflect", params: { blockId: block.id } });
+    setSummaryBlock(block);
   };
 
   const handleCancel = async () => {
     await cancelActiveFocusBlock();
+    if (completionNotificationIdRef.current) {
+      Notifications.cancelScheduledNotificationAsync(
+        completionNotificationIdRef.current,
+      ).catch((error) =>
+        console.log(
+          "Failed to cancel focus block completion notification on cancel",
+          error,
+        ),
+      );
+      completionNotificationIdRef.current = null;
+    }
     setActiveBlock(null);
+    setCompletedIntervals(0);
     setPhase("idle");
     router.back();
+  };
+
+  const handleSummaryNo = async () => {
+    if (summaryBlock) {
+      try {
+        await removeUnloggedFocusBlock(summaryBlock.id);
+      } catch (error) {
+        console.log("Failed to remove unlogged focus block on No", error);
+      }
+    }
+    setSummaryBlock(null);
+    setCompletedIntervals(0);
+    setPhase("idle");
+  };
+
+  const handleSummaryYes = () => {
+    if (!summaryBlock) {
+      return;
+    }
+    const blockId = summaryBlock.id;
+    setSummaryBlock(null);
+    router.push({ pathname: "/block-reflect", params: { blockId } });
   };
 
   const renderTimer = () => {
@@ -236,13 +312,50 @@ export default function FocusBlock() {
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.container}>
           <View style={styles.headerRow}>
-            <TouchableOpacity onPress={handleCancel} hitSlop={16}>
+            <TouchableOpacity
+              onPress={summaryBlock ? handleSummaryNo : handleCancel}
+              hitSlop={16}
+            >
               <Feather name="x" size={22} color="#3D4F5F" />
             </TouchableOpacity>
           </View>
 
           <View style={styles.content}>
-            {!activeBlock && (
+            {summaryBlock && (
+              <View style={styles.summaryContainer}>
+                <Text style={styles.summaryCountText}>
+                  {summaryBlock.blockCount ?? 0}
+                </Text>
+                <Text style={styles.summaryLabelText}>
+                  {summaryBlock.blockCount === 1
+                    ? "Focus block completed"
+                    : "Focus blocks completed"}
+                </Text>
+                <Text style={styles.summaryPromptText}>
+                  {summaryBlock.blockCount === 1
+                    ? "Log this block?"
+                    : "Log these blocks?"}
+                </Text>
+                <View style={styles.summaryButtonsRow}>
+                  <TouchableOpacity
+                    style={[styles.primaryButton, styles.summaryButton]}
+                    activeOpacity={0.9}
+                    onPress={handleSummaryNo}
+                  >
+                    <Text style={styles.primaryButtonText}>No</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.primaryButton, styles.summaryButton]}
+                    activeOpacity={0.9}
+                    onPress={handleSummaryYes}
+                  >
+                    <Text style={styles.primaryButtonText}>Yes</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {!summaryBlock && !activeBlock && (
               <View style={styles.timerBlock}>
                 <Text style={styles.timerText}>25:00</Text>
                 <TouchableOpacity
@@ -255,7 +368,7 @@ export default function FocusBlock() {
               </View>
             )}
 
-            {activeBlock && (
+            {!summaryBlock && activeBlock && (
               <View style={styles.timerBlock}>
                 {renderTimer()}
                 <TouchableOpacity
@@ -339,5 +452,34 @@ const styles = StyleSheet.create({
     fontSize: 64,
     fontWeight: "700",
     color: "#111827",
+  },
+  summaryContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  summaryCountText: {
+    fontSize: 48,
+    fontWeight: "700",
+    color: "#2F3C4A",
+    marginBottom: 8,
+  },
+  summaryLabelText: {
+    fontSize: 16,
+    color: "#2F3C4A",
+    marginBottom: 4,
+  },
+  summaryPromptText: {
+    fontSize: 14,
+    color: "#6B7280",
+    marginBottom: 16,
+  },
+  summaryButtonsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+  },
+  summaryButton: {
+    paddingHorizontal: 32,
   },
 });
