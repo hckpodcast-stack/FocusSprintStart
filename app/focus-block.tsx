@@ -23,7 +23,7 @@ import {
   UnloggedFocusBlock,
 } from "../lib/focus-blocks";
 
-const FOCUS_DURATION_MS = 10 * 1000;
+const FOCUS_DURATION_MS = 60 * 1000;
 const CARD_BG = "#EFECE5";
 const OVERTIME_BG = "#7DD3C0";
 
@@ -58,6 +58,34 @@ export default function FocusBlock() {
   const appState = useRef(AppState.currentState);
   const startScale = useRef(new Animated.Value(1)).current;
   const completionNotificationIdRef = useRef<string | null>(null);
+
+  const scheduleCompletionNotification = async (delaySeconds: number) => {
+    try {
+      // Cancel any existing scheduled completion notification before scheduling the next one
+      if (completionNotificationIdRef.current) {
+        await Notifications.cancelScheduledNotificationAsync(
+          completionNotificationIdRef.current,
+        ).catch(() => {});
+      }
+
+      const id = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "Focus block complete",
+          body: "Your 25-minute focus block has finished.",
+          sound: "default",
+          interruptionLevel: "timeSensitive",
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          seconds: delaySeconds,
+          repeats: true,
+        },
+      });
+      completionNotificationIdRef.current = id;
+    } catch (error) {
+      console.log("Failed to schedule focus block completion notification", error);
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -137,7 +165,7 @@ export default function FocusBlock() {
           }
        };
        triggerTriplePulse();
-    
+
       if (intervals === 1) {
         Animated.timing(rippleBg, {
           toValue: 1,
@@ -167,33 +195,11 @@ export default function FocusBlock() {
     setCompletedIntervals(0);
     setNow(Date.now());
 
-    try {
-      console.log(
-        "handleStart: scheduling completion in seconds =",
-        FOCUS_DURATION_MS / 1000,
-      );
-      const id = await Notifications.scheduleNotificationAsync({
-        content: {
-          title: "Focus block complete",
-          body: "Your 25-minute focus block has finished.",
-          sound: "default",
-          interruptionLevel: "timeSensitive",
-        },
-        trigger: { 
-          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-          seconds: FOCUS_DURATION_MS / 1000,
-          repeats: false,
-        },
-      });
-      console.log("handleStart: scheduled notification id:", id);
-
-      completionNotificationIdRef.current = id;
-    } catch (error) {
-      console.log(
-        "Failed to schedule focus block completion notification",
-        error,
-      );
-    }
+    console.log(
+      "handleStart: scheduling completion in seconds =",
+      FOCUS_DURATION_MS / 1000,
+    );
+    await scheduleCompletionNotification(FOCUS_DURATION_MS / 1000);
 
     rippleBg.setValue(0);
 
