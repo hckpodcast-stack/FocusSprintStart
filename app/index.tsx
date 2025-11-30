@@ -16,10 +16,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { loadGoals, Goal as StoredGoal } from "../lib/goals-storage";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const CONTAINER_PADDING = 32; // Container has paddingHorizontal: 16 (16 * 2)
+const AVAILABLE_WIDTH = SCREEN_WIDTH - CONTAINER_PADDING;
+const CARD_WIDTH = AVAILABLE_WIDTH * 0.95;
 const CARD_SPACING = 16;
-const CARD_WIDTH = SCREEN_WIDTH - 32;
 const LIST_SNAP_INTERVAL = CARD_WIDTH + CARD_SPACING;
-const LIST_SIDE_PADDING = (SCREEN_WIDTH - CARD_WIDTH) / 2;
+const LIST_SIDE_PADDING = (AVAILABLE_WIDTH - CARD_WIDTH) / 2;
 
 type Goal = {
   id: string;
@@ -106,6 +108,10 @@ function HomeScreen(props: HomeScreenProps) {
   const [activeGoalIndex, setActiveGoalIndex] = useState(0);
   const hasGoals = goals.length > 0;
 
+  useEffect(() => {
+    console.log("cardHeight state changed to:", cardHeight);
+  }, [cardHeight]);
+
   const reflectionMessage = useMemo(
     () => getReflectionStatusMessage(totalReflections, reflectionThreshold),
     [totalReflections, reflectionThreshold],
@@ -184,7 +190,7 @@ function HomeScreen(props: HomeScreenProps) {
         </View>
       );
     },
-    [goals.length, onCheckInGoal],
+    [goals.length, onCheckInGoal, cardHeight],
   );
 
   return (
@@ -215,23 +221,22 @@ function HomeScreen(props: HomeScreenProps) {
 
         {hasGoals ? (
           <>
-            <FlatList
-              //style={cardHeight ? [{ height: cardHeight }, styles.goalList] : styles.goalList}
-              style={styles.goalList}
-              data={goals}
-              keyExtractor={(item) => item.id}
-              renderItem={renderGoalItem}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              snapToInterval={LIST_SNAP_INTERVAL}
-              decelerationRate="fast"
-              scrollEventThrottle={16}
-              onScroll={handleScroll}
-              contentContainerStyle={[
-                styles.goalListContent,
-                { paddingHorizontal: LIST_SIDE_PADDING },
-              ]}
-            />
+            <View style={cardHeight ? { height: cardHeight + 24, marginVertical: 4 } : { marginVertical: 4 }}>
+              <FlatList
+                style={styles.goalList}
+                onLayout={(e) => console.log("FlatList height:", e.nativeEvent.layout.height, "cardHeight:", cardHeight)}
+                data={goals}
+                keyExtractor={(item) => item.id}
+                renderItem={renderGoalItem}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                snapToInterval={LIST_SNAP_INTERVAL}
+                decelerationRate="fast"
+                scrollEventThrottle={16}
+                onScroll={handleScroll}
+                contentContainerStyle={styles.goalListContent}
+              />
+            </View>
 
             <View style={styles.goalDotsRow}>
               {goals.map((goal, index) => {
@@ -425,7 +430,7 @@ const styles = StyleSheet.create({
     color: "#2F3C4A",
   },
   goalList: {
-    
+
   },
   goalListContent: {
     paddingVertical: 0,
@@ -523,7 +528,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 0,
+    marginTop: 8,
     marginBottom: 16,
   },
   goalDot: {
