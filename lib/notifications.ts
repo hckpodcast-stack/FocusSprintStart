@@ -7,8 +7,9 @@ import {
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
     shouldSetBadge: false,
   }),
 });
@@ -18,7 +19,7 @@ export async function configureNotifications() {
     await Notifications.setNotificationChannelAsync("focus-block", {
       name: "Focus Blocks",
       importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 250, 250, 250],
+      vibrationPattern: [0, 500],
       lightColor: "#7DD3C0",
     });
   }
@@ -66,4 +67,3 @@ export function registerFocusNotificationResponseListener(router: any) {
     },
   );
 }
-

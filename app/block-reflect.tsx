@@ -24,6 +24,7 @@ import {
   UnloggedFocusBlock,
 } from "../lib/focus-blocks";
 import { loadGoals } from "../lib/goals-storage";
+import { incrementFocusBlocks } from "../lib/focus-stats";
 
 type FocusEmotion =
   | "calm"
@@ -118,6 +119,11 @@ export default function BlockReflect() {
       additionalMemos: goal.additionalMemos ?? [],
       insightsHistory: goal.insightsHistory ?? [],
     }));
+    try {
+      await incrementFocusBlocks(block.blockCount ?? 0);
+    } catch (error) {
+      console.log("Failed to increment focus block stats", error);
+    }
     await removeUnloggedFocusBlock(block.id);
     router.push("/");
   };
@@ -437,4 +443,3 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
 });
-

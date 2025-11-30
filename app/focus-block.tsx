@@ -18,12 +18,12 @@ import {
   cancelActiveFocusBlock,
   completeActiveFocusBlock,
   getActiveFocusBlock,
+  removeUnloggedFocusBlock,
   setActiveFocusBlock,
   UnloggedFocusBlock,
-  removeUnloggedFocusBlock,
 } from "../lib/focus-blocks";
 
-const FOCUS_DURATION_MS = 25 * 60 * 1000;
+const FOCUS_DURATION_MS = 5 * 1000;
 const CARD_BG = "#EFECE5";
 const OVERTIME_BG = "#7DD3C0";
 
@@ -122,8 +122,22 @@ export default function FocusBlock() {
     const intervals = Math.floor(elapsed / FOCUS_DURATION_MS);
 
     if (intervals > 0 && intervals > completedIntervals) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      //Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
+      const triggerTriplePulse = async () => {
+          try {
+              await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+              setTimeout(async () => {
+                  await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+                  setTimeout(async () => {
+                      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+                  }, 100);
+              }, 100);
+          } catch (e) {
 
+          }
+       };
+       triggerTriplePulse();
+    
       if (intervals === 1) {
         Animated.timing(rippleBg, {
           toValue: 1,
@@ -138,6 +152,11 @@ export default function FocusBlock() {
   }, [activeBlock, now, completedIntervals, rippleBg]);
 
   const handleStart = async () => {
+    console.log("handleStart: tapped");
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    console.log("Scheduled notifications:", scheduled);
+    await Notifications.cancelAllScheduledNotificationsAsync();
+
     const block: ActiveFocusBlock = {
       id: `${Date.now()}`,
       startedAt: new Date().toISOString(),
@@ -149,13 +168,24 @@ export default function FocusBlock() {
     setNow(Date.now());
 
     try {
+      console.log(
+        "handleStart: scheduling completion in seconds =",
+        FOCUS_DURATION_MS / 1000,
+      );
       const id = await Notifications.scheduleNotificationAsync({
         content: {
           title: "Focus block complete",
           body: "Your 25-minute focus block has finished.",
+          sound: "default",
         },
-        trigger: { seconds: FOCUS_DURATION_MS / 1000 },
+        trigger: { 
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          seconds: FOCUS_DURATION_MS / 1000,
+          repeats: false,
+        },
       });
+      console.log("handleStart: scheduled notification id:", id);
+
       completionNotificationIdRef.current = id;
     } catch (error) {
       console.log(

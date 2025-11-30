@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { loadGoals, Goal as StoredGoal } from "../lib/goals-storage";
+import { loadFocusStats } from "../lib/focus-stats";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CARD_SPACING = 16;
@@ -36,6 +37,7 @@ type HomeScreenProps = {
   onOpenReflectionLog?: () => void;
   onCreateNewGoal?: () => void;
   onStartFocusBlock?: () => void;
+  totalFocusBlocks?: number;
 };
 
 type GoalDueStatus = {
@@ -100,6 +102,7 @@ function HomeScreen(props: HomeScreenProps) {
     onOpenReflectionLog,
     onCreateNewGoal,
     onStartFocusBlock,
+    totalFocusBlocks = 0,
   } = props;
 
   const [cardHeight, setCardHeight] = useState<number | null>(null);
@@ -195,6 +198,11 @@ function HomeScreen(props: HomeScreenProps) {
             <View style={styles.streakRow}>
               <View style={styles.streakDot} />
               <Text style={styles.streakText}>{streakDays} day streak</Text>
+              <Text style={styles.focusBlocksText}>
+                {"  ·  "}
+                {totalFocusBlocks} focus block
+                {totalFocusBlocks === 1 ? "" : "s"}
+              </Text>
             </View>
             <View style={styles.reflectionRow}>
               <Text style={styles.reflectionEmoji}>🧠</Text>
@@ -297,6 +305,7 @@ export default function Index() {
     banner === "goalLocked",
   );
   const [goals, setGoals] = useState<StoredGoal[]>([]);
+  const [totalFocusBlocks, setTotalFocusBlocks] = useState(0);
 
   useEffect(() => {
     if (banner === "goalLocked") {
@@ -318,6 +327,14 @@ export default function Index() {
       })
       .catch((error) => {
         console.log("Failed to load goals", error);
+      });
+    loadFocusStats()
+      .then((stats) => {
+        if (!isMounted) return;
+        setTotalFocusBlocks(stats.totalBlocks);
+      })
+      .catch((error) => {
+        console.log("Failed to load focus stats", error);
       });
     return () => {
       isMounted = false;
@@ -368,6 +385,7 @@ export default function Index() {
         onOpenReflectionLog={handleOpenReflectionLog}
         onCreateNewGoal={handleCreateNewGoal}
         onStartFocusBlock={handleStartFocusBlock}
+        totalFocusBlocks={totalFocusBlocks}
       />
     </>
   );
@@ -404,6 +422,11 @@ const styles = StyleSheet.create({
   streakText: {
     fontSize: 14,
     fontWeight: "600",
+    color: "#3D4F5F",
+  },
+  focusBlocksText: {
+    fontSize: 14,
+    fontWeight: "500",
     color: "#3D4F5F",
   },
   reflectionRow: {
