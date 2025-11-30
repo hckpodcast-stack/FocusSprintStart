@@ -23,7 +23,7 @@ import {
   UnloggedFocusBlock,
 } from "../lib/focus-blocks";
 
-const FOCUS_DURATION_MS = 5 * 1000;
+const FOCUS_DURATION_MS = 10 * 1000;
 const CARD_BG = "#EFECE5";
 const OVERTIME_BG = "#7DD3C0";
 
@@ -177,6 +177,7 @@ export default function FocusBlock() {
           title: "Focus block complete",
           body: "Your 25-minute focus block has finished.",
           sound: "default",
+          interruptionLevel: "timeSensitive",
         },
         trigger: { 
           type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
