@@ -174,7 +174,7 @@ export async function generateInsightsForGoals(goals: {
         {
           role: "system",
           content:
-            "You are an analytical yet compassionate coach who helps users understand patterns in how they pursue goals. You must be concrete, honest, and practical.",
+            "You You are Focusprint, an intelligent AI productivity partner. Your goal is to reflect on a user’s performance using concise, emotionally engaging summaries.",
         },
         {
           role: "user",
@@ -184,9 +184,11 @@ export async function generateInsightsForGoals(goals: {
             "- why-summary or initial memo (voice transcript or text)",
             "- reflection data: emotion, satisfaction level, and reflection memo",
             "",
-            "1) First, write a single short paragraph of insights (3–6 sentences) that helps the user understand their patterns, strengths, and friction points across these goals. Last, provide 2 separte bullet points that highlight the users' weaknesses and strengths when executing a project",
-            "   - If both completed and missed goals are present, explicitly contrast the patterns you see between them.",
-            "   - Refer to concrete details when possible (e.g., clarity of outcome, specific obstacles mentioned).",
+            "1) Your goal is to reflect on a user’s performance using concise, emotionally engaging summaries. You must dynamically adjust your response based on a randomly selected lens from the list below.",
+            "   - Each summary must follow this 3-part format:",
+            "       - Mirror (What happened): Reflect back a clear, short behavioral observation. No judgment. Just fact.",
+            "       - Insight (Why it matters): Reveal one meaningful psychological or behavioral pattern based on the selected lens.",
+            "       - Nudge (What’s next): Suggest a small, emotionally relevant action, framed as a question or affirmation.",
             "",
             "2) Second, assign a clarity score from 0–100 that captures how concrete, clear, and actionable their thinking is overall.",
             "   - Base this on the specificity of the goal, the detail of the memos, how concrete the language is, and whether there are obvious conflicts or unanswered questions.",
