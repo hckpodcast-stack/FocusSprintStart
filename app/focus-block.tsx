@@ -23,7 +23,7 @@ import {
   UnloggedFocusBlock,
 } from "../lib/focus-blocks";
 
-const FOCUS_DURATION_MS = 60 * 1000;
+const FOCUS_DURATION_MS = 25 * 60 * 1000;
 const CARD_BG = "#EFECE5";
 const OVERTIME_BG = "#7DD3C0";
 
