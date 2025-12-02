@@ -11,8 +11,9 @@ import {
   Text,
   TouchableOpacity,
   View,
+  ScrollView,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { loadGoals, Goal as StoredGoal } from "../lib/goals-storage";
 import { loadFocusStats } from "../lib/focus-stats";
 
@@ -39,6 +40,9 @@ type HomeScreenProps = {
   onOpenReflectionLog?: () => void;
   onCreateNewGoal?: () => void;
   onStartFocusBlock?: () => void;
+  onQuickAddMemo?: () => void;
+  onOpenMenu?: () => void;
+  onOptimize?: () => void;
   totalFocusBlocks?: number;
 };
 
@@ -95,6 +99,7 @@ function getReflectionStatusMessage(totalReflections: number, threshold: number)
 }
 
 function HomeScreen(props: HomeScreenProps) {
+  const insets = useSafeAreaInsets();
   const {
     streakDays,
     totalReflections,
@@ -104,6 +109,9 @@ function HomeScreen(props: HomeScreenProps) {
     onOpenReflectionLog,
     onCreateNewGoal,
     onStartFocusBlock,
+    onQuickAddMemo,
+    onOpenMenu,
+    onOptimize,
     totalFocusBlocks = 0,
   } = props;
 
@@ -198,106 +206,138 @@ function HomeScreen(props: HomeScreenProps) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <View style={styles.topRow}>
-          <View>
-            <View style={styles.streakRow}>
-              <View style={styles.streakDot} />
-              <Text style={styles.streakText}>{streakDays} day streak</Text>
-              <Text style={styles.focusBlocksText}>
-                {"  ·  "}
-                {totalFocusBlocks} focus block
-                {totalFocusBlocks === 1 ? "" : "s"}
-              </Text>
-            </View>
-            <View style={styles.reflectionRow}>
-              <Text style={styles.reflectionEmoji}>🧠</Text>
-              <Text style={styles.reflectionText}>{reflectionMessage}</Text>
-            </View>
-          </View>
-
-          <TouchableOpacity
-            style={styles.menuIconContainer}
-            onPress={() => router.push("/unlogged")}
-            activeOpacity={0.8}
-          >
-            <Feather name="menu" size={20} color="#8D9299" />
-          </TouchableOpacity>
-        </View>
-
-        <Text style={styles.screenTitle}>Intention Archive</Text>
-
-        {hasGoals ? (
-          <>
-            <View style={cardHeight ? { height: cardHeight + 24, marginVertical: 4 } : { marginVertical: 4 }}>
-              <FlatList
-                style={styles.goalList}
-                onLayout={(e) => console.log("FlatList height:", e.nativeEvent.layout.height, "cardHeight:", cardHeight)}
-                data={goals}
-                keyExtractor={(item) => item.id}
-                renderItem={renderGoalItem}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                snapToInterval={LIST_SNAP_INTERVAL}
-                decelerationRate="fast"
-                scrollEventThrottle={16}
-                onScroll={handleScroll}
-                contentContainerStyle={styles.goalListContent}
-              />
-            </View>
-
-            <View style={styles.goalDotsRow}>
-              {goals.map((goal, index) => {
-                const isActive = index === activeGoalIndex;
-                return (
-                  <View
-                    key={goal.id}
-                    style={[
-                      styles.goalDot,
-                      isActive ? styles.goalDotActive : styles.goalDotInactive,
-                    ]}
-                  />
-                );
-              })}
+      <View style={{ flex: 1 }}>
+        <ScrollView
+          contentContainerStyle={[
+            styles.container,
+            { paddingBottom: 16 },
+          ]}
+        >
+          <View style={styles.topRow}>
+            <View>
+              <View style={styles.streakRow}>
+                <View style={styles.streakDot} />
+                <Text style={styles.streakText}>{streakDays} day streak</Text>
+                <Text style={styles.focusBlocksText}>
+                  {"  ·  "}
+                  {totalFocusBlocks} focus block
+                  {totalFocusBlocks === 1 ? "" : "s"}
+                </Text>
+              </View>
+              <View style={styles.reflectionRow}>
+                <Text style={styles.reflectionEmoji}>🧠</Text>
+                <Text style={styles.reflectionText}>{reflectionMessage}</Text>
+              </View>
             </View>
 
             <TouchableOpacity
-              style={styles.focusBlockCard}
-              activeOpacity={0.9}
-              onPress={onStartFocusBlock}
+              style={styles.menuIconContainer}
+              onPress={onOpenMenu}
+              activeOpacity={0.8}
             >
-              <Text style={styles.focusBlockTitle}>Tap to focus</Text>
+              <Feather name="menu" size={20} color="#8D9299" />
             </TouchableOpacity>
-          </>
-        ) : (
-          <View style={styles.emptyStateCard}>
-            <Text style={styles.emptyStateTitle}>No goals yet</Text>
-            <Text style={styles.emptyStateSubtitle}>
-              Create your first goal to see it here.
-            </Text>
           </View>
-        )}
 
-        <TouchableOpacity
-          style={styles.reflectionCard}
-          onPress={onOpenReflectionLog}
-          activeOpacity={0.9}
-        >
-          <View style={styles.reflectionIconContainer}>
-            <Feather name="book-open" size={18} color="#3D4F5F" />
-          </View>
-          <Text style={styles.reflectionCardTitle}>Reflection Log</Text>
-          <View style={{ flex: 1 }} />
-          <Feather name="arrow-right" size={18} color="#8D9299" />
-        </TouchableOpacity>
+          <Text style={styles.screenTitle}>Intention Archive</Text>
 
-        <TouchableOpacity
-          style={[styles.primaryButton, styles.createGoalButton]}
-          onPress={onCreateNewGoal}
-          activeOpacity={0.85}
+          {hasGoals ? (
+            <>
+              <View style={cardHeight ? { height: cardHeight + 24, marginVertical: 4 } : { marginVertical: 4 }}>
+                <FlatList
+                  style={styles.goalList}
+                  onLayout={(e) => console.log("FlatList height:", e.nativeEvent.layout.height, "cardHeight:", cardHeight)}
+                  data={goals}
+                  keyExtractor={(item) => item.id}
+                  renderItem={renderGoalItem}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  snapToInterval={LIST_SNAP_INTERVAL}
+                  decelerationRate="fast"
+                  scrollEventThrottle={16}
+                  onScroll={handleScroll}
+                  contentContainerStyle={styles.goalListContent}
+                />
+              </View>
+
+              <View style={styles.goalDotsRow}>
+                {goals.map((goal, index) => {
+                  const isActive = index === activeGoalIndex;
+                  return (
+                    <View
+                      key={goal.id}
+                      style={[
+                        styles.goalDot,
+                        isActive ? styles.goalDotActive : styles.goalDotInactive,
+                      ]}
+                    />
+                  );
+                })}
+              </View>
+
+              <TouchableOpacity
+                style={styles.focusBlockCard}
+                activeOpacity={0.9}
+                onPress={onStartFocusBlock}
+              >
+                <Text style={styles.focusBlockTitle}>Tap to focus</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.focusBlockCard}
+                activeOpacity={0.9}
+                onPress={onQuickAddMemo}
+              >
+                <Text style={styles.focusBlockTitle}>Add memo</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.focusBlockCard}
+                activeOpacity={0.9}
+                onPress={onOptimize}
+              >
+                <Text style={styles.focusBlockTitle}>Optimize</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <View style={styles.emptyStateCard}>
+              <Text style={styles.emptyStateTitle}>No goals yet</Text>
+              <Text style={styles.emptyStateSubtitle}>
+                Create your first goal to see it here.
+              </Text>
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={styles.reflectionCard}
+            onPress={onOpenReflectionLog}
+            activeOpacity={0.9}
+          >
+            <View style={styles.reflectionIconContainer}>
+              <Feather name="book-open" size={18} color="#3D4F5F" />
+            </View>
+            <Text style={styles.reflectionCardTitle}>Reflection Log</Text>
+            <View style={{ flex: 1 }} />
+            <Feather name="arrow-right" size={18} color="#8D9299" />
+          </TouchableOpacity>
+        </ScrollView>
+
+        <View
+          style={{
+            paddingHorizontal: 16,
+            paddingBottom: 12 + insets.bottom,
+            paddingTop: 8,
+            backgroundColor: "#EFECE5",
+          }}
         >
-          <Text style={styles.primaryButtonText}>Create a New Goal</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.primaryButton, styles.createGoalButton]}
+            onPress={onCreateNewGoal}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.primaryButtonText}>Create a New Goal</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -404,6 +444,9 @@ export default function Index() {
         onOpenReflectionLog={handleOpenReflectionLog}
         onCreateNewGoal={handleCreateNewGoal}
         onStartFocusBlock={handleStartFocusBlock}
+        onQuickAddMemo={() => router.push("/add-memo-quick")}
+        onOpenMenu={() => router.push("/unlogged")}
+        onOptimize={() => router.push("/optimize")}
         totalFocusBlocks={totalFocusBlocks}
       />
     </>
@@ -416,7 +459,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#EFECE5",
   },
   container: {
-    flex: 1,
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 24,

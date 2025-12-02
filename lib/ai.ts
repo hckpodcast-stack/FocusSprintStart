@@ -121,6 +121,124 @@ export async function getTranscriptAndSummary(options: {
   return { transcript, summary };
 }
 
+export async function generateQuickMemoTitleAndSummary(
+  text: string,
+): Promise<{ title: string | null; summary: string | null }> {
+  const trimmed = text.trim();
+  if (!trimmed) return { title: null, summary: null };
+
+  const apiKey = getOpenAIApiKey();
+  const response = await fetch(`${OPENAI_BASE_URL}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You're a smart behavioral coach. Given a memo, produce a concise, intelligible title (3–5 words, grammatically correct) and a paragraph summary that highlights behavioral patterns, insights, energy level, awareness, strengths or weaknesses to help the user understand their behavioral fingerprint and boost performance. Reply as JSON {\"title\": string, \"summary\": string}.",
+        },
+        {
+          role: "user",
+          content: trimmed,
+        },
+      ],
+      temperature: 0.5,
+      max_tokens: 200,
+      response_format: { type: "json_object" },
+    }),
+  });
+
+  if (!response.ok) {
+    console.log("Quick memo title/summary error", await response.text());
+    return { title: null, summary: null };
+  }
+
+  try {
+    const json = (await response.json()) as {
+      choices?: { message?: { content?: string } }[];
+    };
+    const content = json.choices?.[0]?.message?.content;
+    if (!content) return { title: null, summary: null };
+    const parsed = JSON.parse(content) as { title?: string; summary?: string };
+    return {
+      title: parsed.title ?? null,
+      summary: parsed.summary ?? null,
+    };
+  } catch (error) {
+    console.log("Failed to parse quick memo title/summary", error);
+    return { title: null, summary: null };
+  }
+}
+
+export async function generateOptimizeInsights(input: {
+  texts: string[];
+  lens: string;
+  windowLabel: string;
+}): Promise<{ summary: string | null; bullets: string[] }> {
+  const { texts, lens, windowLabel } = input;
+  if (!texts.length) return { summary: null, bullets: [] };
+
+  const apiKey = getOpenAIApiKey();
+  const response = await fetch(`${OPENAI_BASE_URL}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are an insight generator. Given user logs (reflections, focus blocks, quick memos) and a requested lens, produce a concise 150–200 word insight plus exactly 3 short bullet points. If data is insufficient, respond with {\"summary\": null, \"bullets\": []}. Respond as JSON: {\"summary\": string | null, \"bullets\": string[]}.",
+        },
+        {
+          role: "user",
+          content: [
+            `Time window: ${windowLabel}`,
+            `Lens: ${lens}`,
+            "Logs:",
+            texts.join("\n---\n"),
+          ].join("\n"),
+        },
+      ],
+      temperature: 0.4,
+      max_tokens: 300,
+      response_format: { type: "json_object" },
+    }),
+  });
+
+  if (!response.ok) {
+    console.log("Optimize insights error", await response.text());
+    return { summary: null, bullets: [] };
+  }
+
+  try {
+    const json = (await response.json()) as {
+      choices?: { message?: { content?: string } }[];
+    };
+    const content = json.choices?.[0]?.message?.content;
+    if (!content) return { summary: null, bullets: [] };
+    const parsed = JSON.parse(content) as {
+      summary?: string | null;
+      bullets?: string[];
+    };
+    return {
+      summary: parsed.summary ?? null,
+      bullets: Array.isArray(parsed.bullets) ? parsed.bullets.slice(0, 3) : [],
+    };
+  } catch (error) {
+    console.log("Failed to parse optimize insights response", error);
+    return { summary: null, bullets: [] };
+  }
+}
+
 export async function generateInsightsForGoals(goals: {
   title: string;
   dueAt: string;
