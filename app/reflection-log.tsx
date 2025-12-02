@@ -1,13 +1,21 @@
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  Alert,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { Swipeable } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   Goal,
   GoalCompletionStatus,
   GoalFeeling,
   loadGoals,
+  deleteGoal,
 } from "../lib/goals-storage";
 
 type ReflectionLogItem = {
@@ -62,53 +70,96 @@ export default function ReflectionLog() {
     );
   };
 
+  const handleDeleteGoal = (goalId: string) => {
+    Alert.alert(
+      "Delete this reflection?",
+      "This will remove the goal and its reflection from your log.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            setGoals((previous) => previous.filter((goal) => goal.id !== goalId));
+            setSelectedGoalIds((previous) =>
+              previous.filter((id) => id !== goalId),
+            );
+            try {
+              await deleteGoal(goalId);
+            } catch (error) {
+              console.log("Failed to delete goal from reflection log", error);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const renderGoalCard = (goal: Goal) => {
     const reflection = goal.reflection;
     const isSelected = selectedGoalIds.includes(goal.id);
 
     return (
-      <TouchableOpacity
+      <Swipeable
         key={goal.id}
-        style={styles.goalCard}
-        activeOpacity={0.9}
-        onPress={() => toggleSelected(goal.id)}
-      >
-        <View style={styles.goalCardRow}>
-          <View style={styles.goalInfoRow}>
-            <Text style={styles.goalEmoji}>
-              {reflection?.emotion === "calm"
-                ? "😊"
-                : reflection?.emotion === "scattered"
-                  ? "🌀"
-                  : reflection?.emotion === "in_control"
-                    ? "🎯"
-                    : reflection?.emotion === "drained"
-                      ? "😮‍💨"
-                      : reflection?.emotion === "motivated"
-                        ? "💪"
-                        : "🙂"}
-            </Text>
-            <View>
-              <Text style={styles.goalTitle}>{goal.title}</Text>
-              <Text style={styles.goalDueAt}>
-                {new Date(goal.dueAt).toLocaleDateString(undefined, {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </Text>
-            </View>
+        renderRightActions={() => (
+          <View style={styles.deleteActionContainer}>
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={() => handleDeleteGoal(goal.id)}
+              activeOpacity={0.8}
+            >
+              <Feather name="trash-2" size={18} color="#FFFFFF" />
+              <Text style={styles.deleteButtonText}>Delete</Text>
+            </TouchableOpacity>
           </View>
+        )}
+      >
+        <TouchableOpacity
+          style={styles.goalCard}
+          activeOpacity={0.9}
+          onPress={() => toggleSelected(goal.id)}
+        >
+          <View style={styles.goalCardRow}>
+            <View style={styles.goalInfoRow}>
+              <Text style={styles.goalEmoji}>
+                {reflection?.emotion === "calm"
+                  ? "😊"
+                  : reflection?.emotion === "scattered"
+                    ? "🌀"
+                    : reflection?.emotion === "in_control"
+                      ? "🎯"
+                      : reflection?.emotion === "drained"
+                        ? "😮‍💨"
+                        : reflection?.emotion === "motivated"
+                          ? "💪"
+                          : "🙂"}
+              </Text>
+              <View>
+                <Text style={styles.goalTitle}>{goal.title}</Text>
+                <Text style={styles.goalDueAt}>
+                  {new Date(goal.dueAt).toLocaleDateString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </Text>
+              </View>
+            </View>
 
-          <TouchableOpacity
-            style={[styles.selectCircle, isSelected && styles.selectCircleSelected]}
-            activeOpacity={0.8}
-            onPress={() => toggleSelected(goal.id)}
-          >
-            {isSelected && <View style={styles.selectCircleInner} />}
-          </TouchableOpacity>
-        </View>
-      </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.selectCircle,
+                isSelected && styles.selectCircleSelected,
+              ]}
+              activeOpacity={0.8}
+              onPress={() => toggleSelected(goal.id)}
+            >
+              {isSelected && <View style={styles.selectCircleInner} />}
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Swipeable>
     );
   };
 
@@ -248,6 +299,27 @@ const styles = StyleSheet.create({
   goalDueAt: {
     fontSize: 12,
     color: "#9CA3AF",
+  },
+  deleteActionContainer: {
+    justifyContent: "center",
+    alignItems: "flex-end",
+    marginBottom: 10,
+  },
+  deleteButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 90,
+    height: "100%",
+    borderRadius: 18,
+    backgroundColor: "#EF4444",
+    paddingHorizontal: 8,
+  },
+  deleteButtonText: {
+    marginLeft: 6,
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#FFFFFF",
   },
   selectCircle: {
     width: 22,

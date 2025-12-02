@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Dimensions,
@@ -319,20 +319,19 @@ export default function Index() {
       return () => clearTimeout(timer);
     }
   }, [banner]);
-  useEffect(() => {
+
+  const refreshData = useCallback(() => {
     let isMounted = true;
+
     loadGoals()
       .then((data) => {
         if (!isMounted) return;
-        setGoals(
-          data.sort((a, b) =>
-            a.dueAt.localeCompare(b.dueAt),
-          ),
-        );
+        setGoals(data.sort((a, b) => a.dueAt.localeCompare(b.dueAt)));
       })
       .catch((error) => {
         console.log("Failed to load goals", error);
       });
+
     loadFocusStats()
       .then((stats) => {
         if (!isMounted) return;
@@ -341,10 +340,25 @@ export default function Index() {
       .catch((error) => {
         console.log("Failed to load focus stats", error);
       });
+
     return () => {
       isMounted = false;
     };
-  }, [banner]);
+  }, []);
+
+  // Initial load and when banner param changes (e.g., after locking a goal)
+  useEffect(() => {
+    const cleanup = refreshData();
+    return cleanup;
+  }, [refreshData, banner]);
+
+  // Reload whenever the Home screen regains focus (e.g., after Reflect)
+  useFocusEffect(
+    useCallback(() => {
+      const cleanup = refreshData();
+      return cleanup;
+    }, [refreshData]),
+  );
 
   const visibleGoals = goals.filter((goal) => {
     const status = goal.completionStatus;

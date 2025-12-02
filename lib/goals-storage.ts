@@ -146,3 +146,9 @@ export async function updateGoal(
   await saveGoals(next);
 }
 
+export async function deleteGoal(goalId: string): Promise<void> {
+  const current = await loadGoals();
+  const next = current.filter((goal) => goal.id !== goalId);
+  await saveGoals(next);
+}
+

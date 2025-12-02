@@ -1,6 +1,10 @@
 import { Stack, useRouter } from "expo-router";
 import { useEffect } from "react";
-import { configureNotifications, registerFocusNotificationResponseListener } from "../lib/notifications";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import {
+  configureNotifications,
+  registerFocusNotificationResponseListener,
+} from "../lib/notifications";
 
 export default function RootLayout() {
   const router = useRouter();
@@ -16,13 +20,15 @@ export default function RootLayout() {
   }, [router]);
 
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        contentStyle: {
-          backgroundColor: "#EFECE5",
-        },
-      }}
-    />
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: {
+            backgroundColor: "#EFECE5",
+          },
+        }}
+      />
+    </GestureHandlerRootView>
   );
 }
