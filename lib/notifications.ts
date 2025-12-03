@@ -5,6 +5,9 @@ import {
   completeActiveFocusBlock,
 } from "./focus-blocks";
 
+const FOCUS_BLOCK_CHANNEL_ID = "focus-block";
+const GOAL_REMINDER_CHANNEL_ID = "goal-reminders";
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true,
@@ -16,11 +19,18 @@ Notifications.setNotificationHandler({
 
 export async function configureNotifications() {
   if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync("focus-block", {
+    await Notifications.setNotificationChannelAsync(FOCUS_BLOCK_CHANNEL_ID, {
       name: "Focus Blocks",
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 500],
       lightColor: "#7DD3C0",
+    });
+
+    await Notifications.setNotificationChannelAsync(GOAL_REMINDER_CHANNEL_ID, {
+      name: "Goal Reminders",
+      importance: Notifications.AndroidImportance.DEFAULT,
+      vibrationPattern: [0, 300],
+      lightColor: "#60A5FA",
     });
   }
 
@@ -65,5 +75,56 @@ export function registerFocusNotificationResponseListener(router: any) {
         });
       }
     },
+  );
+}
+
+export async function scheduleGoalReminderNotification(options: {
+  goalId: string;
+  reminderId: string;
+  title: string;
+  body: string;
+  date: Date;
+}): Promise<string> {
+  // Use the modern "date" trigger shape instead of passing a bare Date,
+  // which is deprecated in newer Expo SDKs.
+  const trigger: Notifications.NotificationTriggerInput = {
+    type: "date",
+    date: options.date,
+  } as any;
+
+  const content: Notifications.NotificationContentInput = {
+    title: options.title,
+    body: options.body,
+    data: {
+      type: "goal-reminder",
+      goalId: options.goalId,
+      reminderId: options.reminderId,
+    },
+    sound: "default",
+  };
+
+  const request: Notifications.NotificationRequestInput = {
+    content,
+    trigger,
+  };
+
+  if (Platform.OS === "android") {
+    request.content = {
+      ...content,
+      android: { channelId: GOAL_REMINDER_CHANNEL_ID },
+    } as any;
+  }
+
+  const id = await Notifications.scheduleNotificationAsync(request as any);
+  return id;
+}
+
+export async function cancelGoalReminderNotifications(
+  notificationIds: string[],
+): Promise<void> {
+  await Promise.all(
+    notificationIds.map((id) =>
+      Notifications.cancelScheduledNotificationAsync(id).catch(() => {}),
+    ),
   );
 }

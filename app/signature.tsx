@@ -22,7 +22,8 @@ import {
   getDraft,
   updateDraftContract,
 } from "../lib/goal-draft";
-import { getTranscriptAndSummary } from "../lib/ai";
+import { getTranscriptAndSummary, generateReminderMessages } from "../lib/ai";
+import { scheduleGoalReminderNotification } from "../lib/notifications";
 
 type Point = SignatureStrokePoint;
 
@@ -134,6 +135,51 @@ export default function Signature() {
       }
     }
 
+    // Prepare reminder messages and notifications
+    const reminders = draft.reminders ?? [];
+    let reminderNotifications: { reminderId: string; notificationId: string }[] =
+      [];
+
+    const baseForReminders =
+      draft.textMemo ??
+      transcript ??
+      draft.voiceMemoTranscript ??
+      "";
+
+    if (reminders.length > 0 && baseForReminders.trim()) {
+      try {
+        const messages = await generateReminderMessages({
+          baseText: baseForReminders,
+          goalTitle: draft.title,
+          timeWindow,
+          count: reminders.length,
+        });
+
+        const now = Date.now();
+        for (let i = 0; i < reminders.length; i += 1) {
+          const reminder = reminders[i];
+          const message = messages[i] ?? messages[0] ?? "Check in on your goal.";
+          const reminderDate = new Date(reminder.dateTime);
+          if (reminderDate.getTime() <= now) continue;
+
+          const notificationId = await scheduleGoalReminderNotification({
+            goalId: draft.id,
+            reminderId: reminder.id,
+            title: draft.title,
+            body: message,
+            date: reminderDate,
+          });
+
+          reminderNotifications.push({
+            reminderId: reminder.id,
+            notificationId,
+          });
+        }
+      } catch (error) {
+        console.log("Failed to schedule reminder notifications", error);
+      }
+    }
+
     const contract = {
       strokes: points,
       signedAt: new Date().toISOString(),
@@ -155,6 +201,7 @@ export default function Signature() {
       whySummary: summary ?? transcript ?? draft.textMemo ?? undefined,
       contract,
       createdAt: new Date().toISOString(),
+      reminderNotifications,
     };
 
     await appendGoal(goal);

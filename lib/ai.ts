@@ -121,6 +121,84 @@ export async function getTranscriptAndSummary(options: {
   return { transcript, summary };
 }
 
+export async function generateReminderMessages(options: {
+  baseText: string;
+  goalTitle: string;
+  timeWindow?: string | null;
+  count: number;
+}): Promise<string[]> {
+  const { baseText, goalTitle, timeWindow, count } = options;
+  if (!baseText.trim() || count <= 0) return [];
+
+  const apiKey = getOpenAIApiKey();
+
+  const response = await fetch(`${OPENAI_BASE_URL}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You write short, emotionally engaging but supportive push notification messages that help users remember why their goals matter. You DO NOT copy their text verbatim; you digest it and rephrase it in your own words. Stay motivating and future-focused; avoid insults, hate, or self-harm content.",
+        },
+        {
+          role: "user",
+          content:
+            `Goal title: ${goalTitle}\n` +
+            `Time window: ${timeWindow ?? "unspecified"}\n\n` +
+            `User memo (raw text from the user about why this goal matters):\n` +
+            `${baseText}\n\n` +
+            `Write ${count} distinct, short push notification messages (max 140 characters each). ` +
+            `Each should feel like an emotionally stimulating nudge from a caring accountability partner, referencing the user's own reasons. ` +
+            `Respond with exactly ${count} lines, one message per line, no numbering or bullet points, and no additional commentary before or after.`,
+        },
+      ],
+      temperature: 0.8,
+      max_tokens: 300,
+    }),
+  });
+
+  if (!response.ok) {
+    console.log("Reminder message error", await response.text());
+    return [];
+  }
+
+  const json = (await response.json()) as {
+    choices?: { message?: { content?: string } }[];
+  };
+  const content = json.choices?.[0]?.message?.content ?? "";
+
+  // Expect one message per line; split and clean
+  const lines = content
+    .split("\n")
+    .map((line) => line.trim().replace(/^[\d\-\.\)]\s*/, "")) // remove simple numbering/bullets
+    .filter((line) => line.length > 0);
+
+  if (lines.length > 0) {
+    return lines.slice(0, count);
+  }
+
+  // Fallback: use generic AI-style templates that do NOT copy user text directly
+  const templates = [
+    `Future you is counting on today's you to move "${goalTitle}" forward.`,
+    `Remember why "${goalTitle}" matters—take one small step right now.`,
+    `You promised yourself you'd show up for "${goalTitle}". This is that moment.`,
+    `Think about how it will feel when "${goalTitle}" is behind you, not ahead of you.`,
+  ];
+
+  const fallbackMessages: string[] = [];
+  for (let i = 0; i < count; i += 1) {
+    fallbackMessages.push(templates[i % templates.length]);
+  }
+  return fallbackMessages;
+}
+
+
 export async function generateQuickMemoTitleAndSummary(
   text: string,
 ): Promise<{ title: string | null; summary: string | null }> {
@@ -357,4 +435,3 @@ export async function generateInsightsForGoals(goals: {
     return { paragraph: null, clarityScore: null, clarityExplanation: null };
   }
 }
-

@@ -65,6 +65,11 @@ export type FocusBlock = {
   blockCount: number;
 };
 
+export type GoalReminderNotification = {
+  reminderId: string;
+  notificationId: string;
+};
+
 export type Goal = {
   id: string;
   title: string;
@@ -85,6 +90,7 @@ export type Goal = {
   reflection?: GoalReflection;
   additionalMemos?: GoalAdditionalMemo[];
   insightsHistory?: GoalInsight[];
+  reminderNotifications?: GoalReminderNotification[];
 };
 
 const STORAGE_KEY = "@focusSprint/goals-v2";
@@ -151,4 +157,3 @@ export async function deleteGoal(goalId: string): Promise<void> {
   const next = current.filter((goal) => goal.id !== goalId);
   await saveGoals(next);
 }
-

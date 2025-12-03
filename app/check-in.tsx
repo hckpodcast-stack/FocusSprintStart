@@ -9,7 +9,13 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Goal, GoalCompletionStatus, updateGoal, loadGoals } from "../lib/goals-storage";
+import {
+  Goal,
+  GoalCompletionStatus,
+  updateGoal,
+  loadGoals,
+} from "../lib/goals-storage";
+import { cancelGoalReminderNotifications } from "../lib/notifications";
 
 type ConfettiPiece = {
   left: number;
@@ -54,10 +60,25 @@ export default function CheckIn() {
   const updateCompletionStatus = async (status: GoalCompletionStatus) => {
     if (!goalId) return;
     const now = new Date().toISOString();
+
+    // Cancel any scheduled goal reminder notifications for this goal
+    try {
+      const allGoals = await loadGoals();
+      const current = allGoals.find((g) => g.id === goalId);
+      if (current?.reminderNotifications?.length) {
+        await cancelGoalReminderNotifications(
+          current.reminderNotifications.map((n) => n.notificationId),
+        );
+      }
+    } catch (error) {
+      console.log("Failed to cancel goal reminder notifications", error);
+    }
+
     await updateGoal(goalId, (current) => ({
       ...current,
       completionStatus: status,
       completedAt: status === "completed" ? now : current.completedAt ?? now,
+      reminderNotifications: [],
     }));
   };
 
